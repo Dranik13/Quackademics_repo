@@ -49,6 +49,8 @@ class DetectLaneNode(DTROS):
         else:
             self.counter += 1
 
+        # Write your own Code for Lane detection here
+
         np_arr = np.frombuffer(image_msg.data, np.uint8)
         cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
         img = self.crop_img(cv_image)

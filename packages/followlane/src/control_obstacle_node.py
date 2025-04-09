@@ -36,6 +36,8 @@ class ControlObstacleNode(DTROS):
 
         if not self.enable:
             return
+        
+        # Write your code for Obstacle Avoidance here
 
     def fnShutDown(self):
         rospy.loginfo("Shutting down. cmd_vel will be 0")

@@ -31,7 +31,6 @@ class ControlLaneNode(DTROS):
             self.enable = False
 
     def cbFollowLane(self, desired_center):
-
         if not self.enable:
             return
 
@@ -40,6 +39,7 @@ class ControlLaneNode(DTROS):
         self.followLane(center)
 
     def followLane(self, center):
+        # Write your code for a PID controller here
         error = (center - 500) / 100
 
         v = 0.2

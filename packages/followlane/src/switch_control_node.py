@@ -29,9 +29,11 @@ class SwitchControlNode(DTROS):
 
     def cbDuckieDetected(self, msg):
         print('received message')
+        # Write your own code her
 
     def cbLaneDetected(self, msg):
         print('received message')
+        # Write your own code her
 
     def run(self):
         rate = rospy.Rate(10)
