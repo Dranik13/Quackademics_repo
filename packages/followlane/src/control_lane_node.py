@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 
-from enum import Enum
 import rospy
-from std_msgs.msg import Float64
-from enum import Enum
+from std_msgs.msg import Float64, Int32
 
 from duckietown_msgs.msg import Twist2DStamped
 import os
 from duckietown.dtros import DTROS, NodeType
+from switch_control_node import ControlType
 
 class ControlLaneNode(DTROS):
     def __init__(self,node_name):
@@ -18,13 +17,24 @@ class ControlLaneNode(DTROS):
         twist_topic = f"/{vehicle_name}/car_cmd_switch_node/cmd"
         self.pub_cmd_vel = rospy.Publisher(twist_topic, Twist2DStamped, queue_size = 1)
 
-        self.sub_lane = rospy.Subscriber('/detect/lane', Float64, self.cbFollowLane, queue_size = 1)
+        self.sub_lane = rospy.Subscriber(f'/{self._vehicle_name}/detect/lane', Float64, self.cbFollowLane, queue_size = 1)
+        self.sub_control = rospy.Subscriber(f"/{self._vehicle_name}/switch/control", self.cbControl ,Int32, queue_size = 1)
+        self.enable = False
         
         rospy.on_shutdown(self.fnShutDown)
 
-
+    def cbControl(self,msg):
+        if msg.data == ControlType.Lane:
+            self.enable = True
+        
+        else:
+            self.enable = False
 
     def cbFollowLane(self, desired_center):
+
+        if not self.enable:
+            return
+
         print('received message')
         center = desired_center.data
         self.followLane(center)
@@ -41,7 +51,7 @@ class ControlLaneNode(DTROS):
 
     def fnShutDown(self):
         rospy.loginfo("Shutting down. cmd_vel will be 0")
-    
+
         twist = Twist2DStamped(v=0.0, omega=0.0)
         self.pub_cmd_vel.publish(twist) 
 

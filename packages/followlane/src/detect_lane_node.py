@@ -4,7 +4,6 @@ import os
 import rospy
 import numpy as np
 import cv2
-from cv_bridge import CvBridge
 from std_msgs.msg import Float64
 from sensor_msgs.msg import CompressedImage
 from enum import Enum
@@ -25,7 +24,7 @@ class DetectLaneNode(DTROS):
         
         self.sub_image_original = rospy.Subscriber(self._camera_topic, CompressedImage, self.cbFindLane, queue_size = 1)
 
-        self.pub_lane = rospy.Publisher('/detect/lane', Float64, queue_size = 1)
+        self.pub_lane = rospy.Publisher(f'/{self._vehicle_name}/detect/lane', Float64, queue_size = 1)
 
 
     def crop_img(self,img):
