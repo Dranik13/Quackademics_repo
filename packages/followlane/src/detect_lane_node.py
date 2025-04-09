@@ -26,6 +26,7 @@ class DetectLaneNode(DTROS):
 
         self.pub_lane = rospy.Publisher(f'/{self._vehicle_name}/detect/lane', Float64, queue_size = 1)
 
+        self.counter = 0
 
     def crop_img(self,img):
         img = img.copy()
@@ -104,5 +105,5 @@ class DetectLaneNode(DTROS):
         
 if __name__ == '__main__':
 
-    node = DetectLaneNode(node_name='camera_lane_node')
+    node = DetectLaneNode(node_name='detect_lane_node')
     rospy.spin()

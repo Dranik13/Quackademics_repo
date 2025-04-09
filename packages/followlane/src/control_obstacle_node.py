@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import rospy
-from std_msgs.msg import Float64
+from std_msgs.msg import Float64, Int32
 from enum import Enum
 
 from duckietown_msgs.msg import Twist2DStamped
@@ -13,19 +13,19 @@ class ControlObstacleNode(DTROS):
     def __init__(self,node_name):
         super(ControlObstacleNode, self).__init__(node_name=node_name, node_type=NodeType.GENERIC)
         
-
-        vehicle_name = os.environ['VEHICLE_NAME']
-        twist_topic = f"/{vehicle_name}/car_cmd_switch_node/cmd"
+        self.enable = False
+        self._vehicle_name = os.environ['VEHICLE_NAME']
+        twist_topic = f"/{self._vehicle_name}/car_cmd_switch_node/cmd"
         self.pub_cmd_vel = rospy.Publisher(twist_topic, Twist2DStamped, queue_size = 1)
 
         self.sub_duckie = rospy.Subscriber(f"/{self._vehicle_name}/detect/duckie", Float64, self.cbAvoideObstacle, queue_size = 1)
-        self.sub_control = rospy.Subscriber(f"/{self._vehicle_name}/switch/control", self.cbControl ,Int32, queue_size = 1)
-        self.enable = False
+        self.sub_control = rospy.Subscriber(f"/{self._vehicle_name}/switch/control", Int32, self.cbControl, queue_size = 1)
+        
         
         rospy.on_shutdown(self.fnShutDown)
 
     def cbControl(self,msg):
-        if msg.data == ControlType.Obstacle:
+        if msg.data == ControlType.Obstacle.value:
             self.enable = True
         
         else:
@@ -46,6 +46,6 @@ class ControlObstacleNode(DTROS):
 
 if __name__ == '__main__':
     # create the node
-    node = ControlObstacleNode(node_name='control_lane_node')
+    node = ControlObstacleNode(node_name='control_obstacle_node')
     # keep the process from terminating
     rospy.spin()

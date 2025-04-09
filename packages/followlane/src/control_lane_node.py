@@ -12,29 +12,31 @@ class ControlLaneNode(DTROS):
     def __init__(self,node_name):
         super(ControlLaneNode, self).__init__(node_name=node_name, node_type=NodeType.GENERIC)
         
-
-        vehicle_name = os.environ['VEHICLE_NAME']
-        twist_topic = f"/{vehicle_name}/car_cmd_switch_node/cmd"
+        self.enable = False
+        self._vehicle_name = os.environ['VEHICLE_NAME']
+        twist_topic = f"/{self._vehicle_name}/car_cmd_switch_node/cmd"
         self.pub_cmd_vel = rospy.Publisher(twist_topic, Twist2DStamped, queue_size = 1)
 
         self.sub_lane = rospy.Subscriber(f'/{self._vehicle_name}/detect/lane', Float64, self.cbFollowLane, queue_size = 1)
-        self.sub_control = rospy.Subscriber(f"/{self._vehicle_name}/switch/control", self.cbControl ,Int32, queue_size = 1)
-        self.enable = False
+        self.sub_control = rospy.Subscriber(f"/{self._vehicle_name}/switch/control", Int32, self.cbControl , queue_size = 1)
+        
         
         rospy.on_shutdown(self.fnShutDown)
 
     def cbControl(self,msg):
-        if msg.data == ControlType.Lane:
+        if msg.data == ControlType.Lane.value:
             self.enable = True
         
         else:
             self.enable = False
 
     def cbFollowLane(self, desired_center):
-        if not self.enable:
-            return
 
-        print('received message')
+        print(f'received message. enabled : {self.enable}')
+
+        if not self.enable:
+            return        
+        
         center = desired_center.data
         self.followLane(center)
 

@@ -1,11 +1,14 @@
+#!/usr/bin/env python3
+
 import rospy
 import cv2
 import numpy as np
 import os
 from duckietown.dtros import DTROS, NodeType
-from sensor_msgs.msg import CompressedImage
+from sensor_msgs.msg import CompressedImage, Image
 from ultralytics import YOLO
 from std_msgs.msg import Float64
+from cv_bridge import CvBridge
 
 
 class DetectDuckieNode(DTROS):
@@ -19,9 +22,13 @@ class DetectDuckieNode(DTROS):
         self._camera_topic = f"/{self._vehicle_name}/camera_node/image/compressed"
         self.sub_image = rospy.Subscriber(self._camera_topic, CompressedImage, self.cbDetectObjects, queue_size = 1)
         self._yolo_topic = f"/{self._vehicle_name}/detect/duckie/image"
-        self.pup_image = rospy.Publischer(self._yolo_topic,CompressedImage,queue_size = 1)
+        self.pup_image = rospy.Publisher(self._yolo_topic,Image,queue_size = 1)
         self._duckie_topic = f"/{self._vehicle_name}/detect/duckie"
-        self.pup_image = rospy.Publischer(self._duckie_topic,Float64,queue_size = 1)
+        self.pup_duckie = rospy.Publisher(self._duckie_topic,Float64,queue_size = 1)
+
+        self.counter = 0
+        self.bridge = CvBridge()
+
 
     def cbDetectObjects(self,image_msg):
         if self.counter % 3 != 0:
@@ -36,14 +43,8 @@ class DetectDuckieNode(DTROS):
         results = self._model(cv_image) #, classes=)
         image = draw_bounding_boxes(results,cv_image)
 
-
-        #### Create CompressedIamge ####
-        msg = CompressedImage()
-        msg.header.stamp = rospy.Time.now()
-        msg.format = "jpeg"
-        msg.data = np.array(cv2.imencode('.jpg', image)[1]).tostring()
-        # Publish new image
-        self.pup_image(msg)
+        msg = self.bridge.cv2_to_imgmsg(image, "bgr8")
+        self.pup_image.publish(msg)
 
 
         
@@ -61,5 +62,5 @@ def draw_bounding_boxes(results,img):
 
 if __name__ == '__main__':
 
-    node = DetectDuckieNode(node_name='camera_lane_node')
+    node = DetectDuckieNode(node_name='detect_duckie_node')
     rospy.spin()
