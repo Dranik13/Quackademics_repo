@@ -7,7 +7,7 @@ from sensor_msgs.msg import CompressedImage
 import yaml
 import cv2
 from cv_bridge import CvBridge
-from students.src.remote_control_node import RemoteControlNode
+#from students.src.remote_control_node import RemoteControlNode
 
 class CameraReaderNode(DTROS):
 
