@@ -12,19 +12,23 @@ from cv_bridge import CvBridge
 class CameraReaderNode(DTROS):
 
     def __init__(self, node_name):
+        print("init_start")
         # initialize the DTROS parent class
         super(CameraReaderNode, self).__init__(node_name=node_name, node_type=NodeType.VISUALIZATION)
+        
         # static parameters
         self._vehicle_name = os.environ['VEHICLE_NAME']
+        
         self._camera_topic = f"/{self._vehicle_name}/camera_node/image/compressed"
+        # construct subscriber
+        self.sub = rospy.Subscriber(self._camera_topic, CompressedImage, self.callback, queue_size = 1)
+        
         # bridge between OpenCV and ROS
         self._bridge = CvBridge()
+        
         # create window
         self._window = "camera-reader"
         
-        # construct subscriber
-        self.sub = rospy.Subscriber(self._camera_topic, CompressedImage, self.callback)
-
         with open('packages/followlane/config/detect_lane.yaml','r') as f:
             text = f.read()
 
@@ -32,10 +36,10 @@ class CameraReaderNode(DTROS):
 
         self.names = ['white','yellow','duck','lane image']
         self.name = self.names[0]
-
         cv2.namedWindow(self._window, cv2.WINDOW_AUTOSIZE)
         self.createWindow(0)
-
+        
+        print("finished init")
         rospy.on_shutdown(self.fnShutDown)
 
 
@@ -59,6 +63,7 @@ class CameraReaderNode(DTROS):
 #
 
     def changeName(self,x):
+        print("changeName")
         self.name = self.names[x]
         self.createWindow(x)
 
@@ -70,14 +75,26 @@ class CameraReaderNode(DTROS):
         print(text)
 
     def callback(self, msg):
-
+        #print("callback")
+        #print("cv2get...: ",cv2.getWindowProperty(self._window, 0))
         if cv2.getWindowProperty(self._window, 0) == -1:
-            return 
-        
+            print("cv2... == -1")
+            return
+        '''
+        try:
+            if cv2.getWindowProperty(self._window, 0) == -1:
+                return 
+        except cv2.error as e:
+            rospy.logwarn(f"OpenCV window error: {e}")
+            return
+        '''
+        print("callback1")
         # convert JPEG bytes to CV image
         image = self._bridge.compressed_imgmsg_to_cv2(msg)
+        print("callback2")
         # display frame
         image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        print("callback3")
         
         if self.name == 'lane image':
             for slider_name in ['top_left_x','top_left_y','top_right_x','top_right_y','bottom_left_x','bottom_left_y','bottom_right_x','bottom_right_y']:
@@ -99,7 +116,7 @@ class CameraReaderNode(DTROS):
             cv2.imshow(self._window, image)
             cv2.waitKey(1)
             return
-
+        print("callback4")
         #print(self.name)
         self.conf[self.name]['hl'] = cv2.getTrackbarPos('hl', self._window) 
         self.conf[self.name]['hh'] = cv2.getTrackbarPos('hh', self._window)  
@@ -107,25 +124,26 @@ class CameraReaderNode(DTROS):
         self.conf[self.name]['sh'] = cv2.getTrackbarPos('sh', self._window) 
         self.conf[self.name]['vl'] = cv2.getTrackbarPos('vl', self._window) 
         self.conf[self.name]['vh'] = cv2.getTrackbarPos('vh', self._window)
-
+        print("callback5")
         self._hl = self.conf[self.name]['hl']
         self._hh = self.conf[self.name]['hh'] 
         self._sl = self.conf[self.name]['sl']
         self._sh = self.conf[self.name]['sh']
         self._vl = self.conf[self.name]['vl']
         self._vh = self.conf[self.name]['vh'] 
-
+        print("callback6")
         image = cv2.inRange(image, 
                            (self._hl,self._sl, self._vl), 
                            (self._hh,self._sh, self._vh),)
-
+        print("callback7")
         image = cv2.putText(image,self.name,(100,100),cv2.QT_FONT_NORMAL, 2, (255,255,255), 2)
-
+        print("callback8")
         cv2.imshow(self._window, image)
 
         cv2.waitKey(1)
 
     def fnShutDown(self):
+        print("fnShutDown")
         text = yaml.safe_dump(self.conf)
         with open('packages/followlane/config/detect_lane.yaml','w') as f:
             f.write(text)
@@ -134,6 +152,7 @@ class CameraReaderNode(DTROS):
         print(text)
 
     def createWindow(self,x):
+        print("createWindow")
         
         cv2.destroyAllWindows()
         print('destroyed')

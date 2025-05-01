@@ -2,11 +2,45 @@
 
 import rospy
 from std_msgs.msg import Float64, Int32
+import numbers
 
 from duckietown_msgs.msg import Twist2DStamped
 import os
 from duckietown.dtros import DTROS, NodeType
 from switch_control_node import ControlType
+
+
+class pid():
+    def __init__(self):
+        self.Kp = 2     # P Anteil meist 2.0 - 4.0
+        self.Ki = 0     # I Anteil meist 0.0 - 0.5
+        self.Kd = 0     # D Anteil meist 0.1 - 1.0
+        self.dt = 0.1   # Zeitintervall
+
+        self.integral = 0   # sum of error (integral)
+        self.prev_error = 0 # Previous Error (on start == 0)
+
+    def update(self, error):
+        
+        if isinstance(error, numbers.Number) == False:
+            error = 0
+
+        P = error * self.Kp
+        
+        self.integral += error * self.dt
+        I = error * self.integral
+        
+        # can't divide by negative number, so dt = 0 if self.dt is negative
+        if self.dt > 0:
+            dt = self.dt
+        else:
+            dt = 0
+        derivative = (error - self.prev_error) / dt
+        D = self.Kd * derivative
+
+        self.prev_error = error     # save last error
+
+        return P+I+D
 
 class ControlLaneNode(DTROS):
     def __init__(self,node_name):
@@ -20,7 +54,6 @@ class ControlLaneNode(DTROS):
         self.sub_lane = rospy.Subscriber(f'/{self._vehicle_name}/detect/lane', Float64, self.cbFollowLane, queue_size = 1)
         self.sub_control = rospy.Subscriber(f"/{self._vehicle_name}/switch/control", Int32, self.cbControl , queue_size = 1)
         
-        
         rospy.on_shutdown(self.fnShutDown)
 
     def cbControl(self,msg):
@@ -32,8 +65,6 @@ class ControlLaneNode(DTROS):
 
     def cbFollowLane(self, desired_center):
 
-        print(f'received message. enabled : {self.enable}')
-
         if not self.enable:
             return        
         
@@ -41,21 +72,21 @@ class ControlLaneNode(DTROS):
         self.followLane(center)
 
     def followLane(self, center):
-        # Write your code for a PID controller here
         error = (center - 500) / 100
 
         v = 0.2
-        a = error
+        a = pid.update(error)
         
         twist = Twist2DStamped(v=v, omega=a)
         print(f'moving {v} {a} error {error}')
         self.pub_cmd_vel.publish(twist)
 
+
     def fnShutDown(self):
         rospy.loginfo("Shutting down. cmd_vel will be 0")
 
         twist = Twist2DStamped(v=0.0, omega=0.0)
-        self.pub_cmd_vel.publish(twist) 
+        self.pub_cmd_vel.publish(twist)
 
 if __name__ == '__main__':
     # create the node

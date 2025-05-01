@@ -9,14 +9,12 @@ from sensor_msgs.msg import CompressedImage
 from enum import Enum
 import yaml
 
-
 from duckietown.dtros import DTROS, NodeType
 
 class DetectLaneNode(DTROS):
     def __init__(self, node_name):
         # initialize the DTROS parent class
         super(DetectLaneNode, self).__init__(node_name=node_name, node_type=NodeType.VISUALIZATION)
-
 
         self.load_conf('packages/followlane/config/detect_lane.yaml')
         self._vehicle_name = os.environ['VEHICLE_NAME']
@@ -30,7 +28,6 @@ class DetectLaneNode(DTROS):
 
     def crop_img(self,img):
         img = img.copy()
-        print(img.shape)
 
         pts1 = np.float32([
             [self.conf['lane_image']['top_left_x'],     self.conf['lane_image']['top_left_y']],
@@ -44,6 +41,7 @@ class DetectLaneNode(DTROS):
         return cv2.warpPerspective(img,M,(100,100))
 
     def cbFindLane(self, image_msg):
+        # every third image will be used???
         if self.counter % 3 != 0:
             self.counter += 1
             return

@@ -21,17 +21,21 @@ class SwitchControlNode(DTROS):
         self.sub_lane = rospy.Subscriber(f"/{self._vehicle_name}/detect/lane", Float64, self.cbLaneDetected, queue_size = 1)
         self.pub_control = rospy.Publisher(f"/{self._vehicle_name}/switch/control", Int32, queue_size = 1)
         
-        self._control_mode = ControlType.Lane
+        self._control_mode = ControlType.Lane   # start mode == Lane
 
 
 
     def cbDuckieDetected(self, msg):
-        print('received message')
-        # Write your own code her
+        print('received message DuckieDetected')
+        # Write your own code here
+        # Change Mode to Duckie if Duckie is detected and lock it for X time?
+        #self._control_mode = ControlType.Obstacle
 
     def cbLaneDetected(self, msg):
-        print('received message')
-        # Write your own code her
+        print('received message LaneDetected')
+        # Write your own code here
+        # Change control Mode if Lane Detected and no Duckie
+        #self._control_mode = ControlType.Lane
 
     def run(self):
         rate = rospy.Rate(10)
