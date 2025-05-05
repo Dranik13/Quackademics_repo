@@ -85,7 +85,7 @@ class ControlLaneNode(DTROS):
     def followLane(self, center):
         # TODO write here your PID controler
         print("center: ", center)
-        error = (center - 50) / 100 # ? why -500?
+        error = -(center - 50) / 100 # ? why -500?
         #print("error: ", error)
 
         if isinstance(error, numbers.Number) == False:

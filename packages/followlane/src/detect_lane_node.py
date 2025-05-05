@@ -70,27 +70,47 @@ class DetectLaneNode(DTROS):
                            (self.hue_white_l,self.saturation_white_l, self.lightness_white_l), 
                            (self.hue_white_h,self.saturation_white_h, self.lightness_white_h),)
 
+
+        # Koordinaten der gelben und weißen Bereiche
+        coords_yellow = np.where(mask_yellow != 0)
+        coords_white = np.where(mask_white != 0)
+        
+        # Berechne Mittelwerte (Mitte der jeweiligen Masken)
+        if coords_white[0].size > 0:
+            center_y_white = np.mean(coords_white[0])
+            center_x_white = np.mean(coords_white[1])
+            center_white = (int(center_x_white), int(center_y_white))
+            print("center_white: ", center_x_white)
+
+        if coords_yellow[0].size > 0:
+            center_y_yellow = np.mean(coords_yellow[0])
+            center_x_yellow = np.mean(coords_yellow[1])
+            center_yellow = (int(center_x_yellow), int(center_y_yellow))
+            print("center_yellow: ", center_x_yellow)
+            
+
+        '''
         #print("mask_white: ", mask_white)
         #print("mask_yellow: ", mask_yellow)
         center_white = np.mean(np.where(mask_white != 0))
         center_yellow = np.mean(np.where(mask_yellow != 0))
-
+        '''
         msg_desired_center = Float64()
         # unterscheidung welche Linie erkannt wird
         
-        if center_white > 0 and center_yellow > 0:
-            msg_desired_center.data = (center_white + center_yellow) / 2
-        elif center_white > 0:
-            msg_desired_center.data = center_white 
-        elif center_yellow > 0:
-            msg_desired_center.data = center_yellow
+        if coords_white[0].size > 0 and coords_yellow[0].size > 0:
+            msg_desired_center.data = (center_x_white + center_x_yellow) / 2
+        elif coords_white[0].size > 0:
+            msg_desired_center.data = center_x_white
+        elif coords_yellow[0].size > 0:
+            msg_desired_center.data = center_x_yellow
         else:
             msg_desired_center.data = 50
 
         
         #msg_desired_center.data = (center_white + center_yellow) / 2
-        print("center_white: ", center_white)
-        print("center_yellow: ", center_yellow)
+        
+        
         print("msg_desired_center: ", msg_desired_center.data)
         self.pub_lane.publish(msg_desired_center)
         #self.print_center(msg_desired_center.data, image_msg)
