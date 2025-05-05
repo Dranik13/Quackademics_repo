@@ -27,15 +27,16 @@ class SwitchControlNode(DTROS):
 
     def cbDuckieDetected(self, msg):
         print('received message DuckieDetected')
-        # Write your own code here
-        # Change Mode to Duckie if Duckie is detected and lock it for X time?
+        # TODO Write your own code here
+        # ? Change Mode to Duckie if Duckie is detected and lock it for X time?
         #self._control_mode = ControlType.Obstacle
 
     def cbLaneDetected(self, msg):
-        print('received message LaneDetected')
-        # Write your own code here
-        # Change control Mode if Lane Detected and no Duckie
+        #print('received message LaneDetected')
+        # TODO Write your own code here
+        # ? Change control Mode if Lane Detected and no Duckie
         #self._control_mode = ControlType.Lane
+        pass
 
     def run(self):
         rate = rospy.Rate(10)

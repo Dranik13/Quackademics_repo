@@ -5,9 +5,10 @@ import rospy
 import numpy as np
 import cv2
 from std_msgs.msg import Float64
-from sensor_msgs.msg import CompressedImage
+from sensor_msgs.msg import CompressedImage, Image
 from enum import Enum
 import yaml
+from cv_bridge import CvBridge
 
 from duckietown.dtros import DTROS, NodeType
 
@@ -23,6 +24,9 @@ class DetectLaneNode(DTROS):
         self.sub_image_original = rospy.Subscriber(self._camera_topic, CompressedImage, self.cbFindLane, queue_size = 1)
 
         self.pub_lane = rospy.Publisher(f'/{self._vehicle_name}/detect/lane', Float64, queue_size = 1)
+        self.pub_lane_img = rospy.Publisher(f"/{self._vehicle_name}/camera_node/image/LaneCenter", Image, queue_size = 1)
+
+        self._bridge = CvBridge()
 
         self.counter = 0
 
@@ -41,14 +45,16 @@ class DetectLaneNode(DTROS):
         return cv2.warpPerspective(img,M,(100,100))
 
     def cbFindLane(self, image_msg):
-        # every third image will be used???
+
+        # ? every third image will be used???
+
         if self.counter % 3 != 0:
             self.counter += 1
             return
         else:
             self.counter += 1
 
-        # Write your own Code for Lane detection here
+        # TODO Write your own Code for Lane detection here
 
         np_arr = np.frombuffer(image_msg.data, np.uint8)
         cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
@@ -64,13 +70,41 @@ class DetectLaneNode(DTROS):
                            (self.hue_white_l,self.saturation_white_l, self.lightness_white_l), 
                            (self.hue_white_h,self.saturation_white_h, self.lightness_white_h),)
 
-
+        #print("mask_white: ", mask_white)
+        #print("mask_yellow: ", mask_yellow)
         center_white = np.mean(np.where(mask_white != 0))
         center_yellow = np.mean(np.where(mask_yellow != 0))
 
         msg_desired_center = Float64()
-        msg_desired_center.data = (center_white + center_yellow) / 2
+        # ! Limits must be tested (+-100)
+        # unterscheidung welche Linie erkannt wird
+        
+        if center_white > 0 and center_yellow > 0:
+            msg_desired_center.data = (center_white + center_yellow) / 2
+        elif center_white > 0:
+            msg_desired_center.data = center_white 
+        elif center_yellow > 0:
+            msg_desired_center.data = center_yellow
+        else:
+            msg_desired_center.data = 50
+
+        
+
+        #msg_desired_center.data = (center_white + center_yellow) / 2
+        print("center_white: ", center_white)
+        print("center_yellow: ", center_yellow)
+        print("msg_desired_center: ", msg_desired_center.data)
         self.pub_lane.publish(msg_desired_center)
+        self.print_center(msg_desired_center.data, image_msg)
+
+    def print_center(self, center, image_msg):
+        img = self._bridge.compressed_imgmsg_to_cv2(image_msg)
+        point = (center, 20)
+        cv2.circle(img, point, radius=5, color=(0, 0, 255), thickness=-1)
+        
+        ros_img = self._bridge.cv2_to_imgmsg(img, encoding="bgr8")
+        
+        self.pub_lane_img(ros_img)
 
     def load_conf(self,path):
 
