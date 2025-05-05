@@ -76,7 +76,6 @@ class DetectLaneNode(DTROS):
         center_yellow = np.mean(np.where(mask_yellow != 0))
 
         msg_desired_center = Float64()
-        # ! Limits must be tested (+-100)
         # unterscheidung welche Linie erkannt wird
         
         if center_white > 0 and center_yellow > 0:
@@ -89,13 +88,12 @@ class DetectLaneNode(DTROS):
             msg_desired_center.data = 50
 
         
-
         #msg_desired_center.data = (center_white + center_yellow) / 2
         print("center_white: ", center_white)
         print("center_yellow: ", center_yellow)
         print("msg_desired_center: ", msg_desired_center.data)
         self.pub_lane.publish(msg_desired_center)
-        self.print_center(msg_desired_center.data, image_msg)
+        #self.print_center(msg_desired_center.data, image_msg)
 
     def print_center(self, center, image_msg):
         img = self._bridge.compressed_imgmsg_to_cv2(image_msg)

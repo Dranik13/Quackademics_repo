@@ -53,7 +53,7 @@ class DetectLaneNode():
 
         # Weiße Maskenkonturen extrahieren
         contours_white, _ = cv2.findContours(mask_white, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
+        print("Type: ", type(cv_image))
         img_copy = img.copy()
         #img_copy = cv2.cvtColor(img_copy, cv2.COLOR_RGB2GRAY)
         # Gelbe Konturen einzeichnen (z.B. mit Farbe Gelb)
