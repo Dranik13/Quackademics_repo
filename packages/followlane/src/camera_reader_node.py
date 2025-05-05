@@ -4,6 +4,7 @@ import os
 import rospy
 from duckietown.dtros import DTROS, NodeType
 from sensor_msgs.msg import CompressedImage, Image
+from PIL import Image as im
 import yaml
 import cv2
 import numpy as np
@@ -30,6 +31,7 @@ class CameraReaderNode(DTROS):
         
         # create window
         self._window = "camera-reader"
+        #self._window2 = "camera-reader2"
         '''
         with open('packages/followlane/config/detect_lane.yaml','r') as f:
             text = f.read()
@@ -39,11 +41,13 @@ class CameraReaderNode(DTROS):
         self.names = ['white','yellow','duck','lane image']
         self.name = self.names[0]
         '''
-        cv2.namedWindow(self._window, cv2.WINDOW_AUTOSIZE)
+        #cv2.namedWindow(self._window, cv2.WINDOW_AUTOSIZE)
+        #cv2.namedWindow(self._window2, cv2.WINDOW_AUTOSIZE)
         #self.createWindow(0)
-        self.sub = rospy.Subscriber(self._camera_topic, CompressedImage, self.callback, queue_size = 1)
+        self.sub = rospy.Subscriber(self._camera_topic, CompressedImage, self.callback)
         self.pub = rospy.Publisher(self._camera_topic_send, Image, queue_size = 1)
         #rospy.on_shutdown(self.fnShutDown)
+        
 
     def crop_img(self,img):
         img = img.copy()
@@ -58,7 +62,7 @@ class CameraReaderNode(DTROS):
 
         M = cv2.getPerspectiveTransform(pts1,pts2)
         return cv2.warpPerspective(img,M,(100,100))
-
+    '''
     #def on_change_hl(self,val):
     #    self._hl = val
     #    
@@ -77,35 +81,7 @@ class CameraReaderNode(DTROS):
     #def on_change_vh(self,val):
     #    self._vh = val
 #
-
-    def print_color(self, image_msg):
-        
-        #np_arr = np.frombuffer(image_msg.data, np.uint8)
-        #cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-        #img = self.crop_img(cv_image)
-        img = self._bridge.compressed_imgmsg_to_cv2(image_msg)
-        cv2.imshow(img)
-        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-
-        mask_yellow = cv2.inRange(hsv, 
-                           (self.hue_yellow_l,self.saturation_yellow_l, self.lightness_yellow_l), 
-                           (self.hue_yellow_h,self.saturation_yellow_h, self.lightness_yellow_h),)
-        
-        mask_white = cv2.inRange(hsv, 
-                           (self.hue_white_l,self.saturation_white_l, self.lightness_white_l), 
-                           (self.hue_white_h,self.saturation_white_h, self.lightness_white_h),)
-        
-        
-        # Highlight erzeugen
-        yellow = cv2.bitwise_and(img, img, mask=mask_yellow)
-        white  = cv2.bitwise_and(img, img, mask=mask_white)
-        result = cv2.addWeighted(yellow, 1.0, white, 1.0, 0)
-
-        # Publish bearbeitetes Bild
-        ros_img = self._bridge.cv2_to_imgmsg(result, encoding="bgr8")
-        self.pub.publish(ros_img)
-        
-
+    '''
 
     def changeName(self,x):
         print("changeName")
@@ -120,27 +96,72 @@ class CameraReaderNode(DTROS):
         print(text)
 
     def callback(self, msg):
-        #print("callback")
-        #print("cv2get...: ",cv2.getWindowProperty(self._window, 0))
-        '''
-        if cv2.getWindowProperty(self._window, 0) == -1:
-            print("cv2... == -1")
-            return
+
+        np_arr = np.frombuffer(msg.data, np.uint8)
+        image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR) # OpenCV >= 3.0:
+        #self.latest_image = image_np.copy()  # oder image_np.copy()
         
-        try:
-            if cv2.getWindowProperty(self._window, 0) == -1:
-                return 
-        except cv2.error as e:
-            rospy.logwarn(f"OpenCV window error: {e}")
-            return
-        '''
+        img = self.crop_img(image)
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
-        self.print_color(msg)
+        mask_yellow = cv2.inRange(hsv, 
+                           (self.hue_yellow_l,self.saturation_yellow_l, self.lightness_yellow_l), 
+                           (self.hue_yellow_h,self.saturation_yellow_h, self.lightness_yellow_h),)
+        
+        mask_white = cv2.inRange(hsv, 
+                           (self.hue_white_l,self.saturation_white_l, self.lightness_white_l), 
+                           (self.hue_white_h,self.saturation_white_h, self.lightness_white_h),)
+        
+        # Koordinaten der gelben und weißen Bereiche
+        coords_yellow = np.where(mask_yellow != 0)
+        coords_white = np.where(mask_white != 0)
 
-        # convert JPEG bytes to CV image
-        image = self._bridge.compressed_imgmsg_to_cv2(msg)
-        # display frame
-        #image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        # Gelbe Maskenkonturen extrahieren
+        contours_yellow, _ = cv2.findContours(mask_yellow, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # Weiße Maskenkonturen extrahieren
+        contours_white, _ = cv2.findContours(mask_white, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        img_copy = img.copy()
+        #img_copy = cv2.cvtColor(img_copy, cv2.COLOR_RGB2GRAY)
+        # Gelbe Konturen einzeichnen (z.B. mit Farbe Gelb)
+        cv2.drawContours(img_copy, contours_yellow, -1, (0, 0, 255), 1)  # Gelb
+
+        # Weiße Konturen einzeichnen (z.B. mit Farbe Weiß)
+        cv2.drawContours(img_copy, contours_white, -1, (0, 0, 255), 1)  # Weiß
+        img_resized = cv2.resize(img_copy, (400, 400))
+        # Zeige das Bild mit den eingezeichneten Konturen an
+        img_circle_copy = img.copy()
+        # Berechne Mittelwerte (Mitte der jeweiligen Masken)
+        if coords_white[0].size > 0:
+            center_y_white = np.mean(coords_white[0])
+            center_x_white = np.mean(coords_white[1])
+            center_white = (int(center_x_white), int(center_y_white))
+            # Einzeichnen des Punkts für die weiße Fläche
+            cv2.circle(img_circle_copy, center_white, radius=2, color=(255, 0, 0), thickness=-1)  # Blau
+
+        if coords_yellow[0].size > 0:
+            center_yellow = np.mean(coords_yellow[0])
+            center_x_yellow = np.mean(coords_yellow[1])
+            center_yellow = (int(center_x_yellow), int(center_yellow))
+            # Einzeichnen des Punkts für die gelbe Fläche
+            cv2.circle(img_circle_copy, center_yellow, radius=2, color=(0, 255, 255), thickness=-1)  # Gelb
+        img_circle_resized = cv2.resize(img_circle_copy, (400, 400))
+        # Highlight erzeugen
+        yellow = cv2.bitwise_and(img, img, mask=mask_yellow)
+        white  = cv2.bitwise_and(img, img, mask=mask_white)
+        result = cv2.addWeighted(yellow, 1.0, white, 1.0, 0)
+        result_resized = cv2.resize(result, (400, 400))
+
+        # Publish bearbeitetes Bild
+        ros_img = self._bridge.cv2_to_imgmsg(img_circle_resized, encoding="bgr8")
+        self.pub.publish(ros_img)
+
+        cv2.imshow("Result", result_resized)
+        cv2.imshow("Center Lanes", img_circle_resized)
+        cv2.imshow("Detected Lanes", img_resized)
+        cv2.imshow("camera", image)
+        cv2.waitKey(1)
+    
         '''
         if self.name == 'lane image':
             for slider_name in ['top_left_x','top_left_y','top_right_x','top_right_y','bottom_left_x','bottom_left_y','bottom_right_x','bottom_right_y']:
@@ -162,33 +183,23 @@ class CameraReaderNode(DTROS):
             cv2.imshow(self._window, image)
             cv2.waitKey(1)
             return
-        print("callback4")
-        #print(self.name)
         self.conf[self.name]['hl'] = cv2.getTrackbarPos('hl', self._window) 
         self.conf[self.name]['hh'] = cv2.getTrackbarPos('hh', self._window)  
         self.conf[self.name]['sl'] = cv2.getTrackbarPos('sl', self._window) 
         self.conf[self.name]['sh'] = cv2.getTrackbarPos('sh', self._window) 
         self.conf[self.name]['vl'] = cv2.getTrackbarPos('vl', self._window) 
         self.conf[self.name]['vh'] = cv2.getTrackbarPos('vh', self._window)
-        print("callback5")
         self._hl = self.conf[self.name]['hl']
         self._hh = self.conf[self.name]['hh'] 
         self._sl = self.conf[self.name]['sl']
         self._sh = self.conf[self.name]['sh']
         self._vl = self.conf[self.name]['vl']
         self._vh = self.conf[self.name]['vh'] 
-        print("callback6")
         image = cv2.inRange(image, 
                            (self._hl,self._sl, self._vl), 
                            (self._hh,self._sh, self._vh),)
-        print("callback7")
         image = cv2.putText(image,self.name,(100,100),cv2.QT_FONT_NORMAL, 2, (255,255,255), 2)
-        print("callback8")
-        '''
-        cv2.imshow(self._window, image)
 
-        cv2.waitKey(1)
-    '''
     def fnShutDown(self):
         print("fnShutDown")
         text = yaml.safe_dump(self.conf)
@@ -197,9 +208,8 @@ class CameraReaderNode(DTROS):
             print('written in yaml')
 
         print(text)
-
+    
     def createWindow(self,x):
-        print("createWindow")
         
         cv2.destroyAllWindows()
         print('destroyed')
@@ -209,7 +219,6 @@ class CameraReaderNode(DTROS):
         changeName = lambda x : self.changeName(x)
         cv2.createTrackbar('color',self._window,0,len(self.names) -1, changeName)
         cv2.setTrackbarPos('color',self._window,x)
-
 
         if self.name == 'lane image':
             for slider_name in ['top_left_x','top_left_y','top_right_x','top_right_y','bottom_left_x','bottom_left_y','bottom_right_x','bottom_right_y']:
