@@ -16,11 +16,11 @@ dt-launchfile-init
 #ls -l "$(dirname "$0")/"
 
 #dt-exec bash /launch/Quackademics_repo/camera-reader.sh 
-dt-exec bash /launch/Quackademics_repo/control-lane.sh &
+#dt-exec bash /launch/Quackademics_repo/control-lane.sh &
 #dt-exec bash /launch/Quackademics_repo/control-obstacle.sh &
-#dt-exec bash /launch/Quackademics_repo/detect-duckie.sh &
-dt-exec bash /launch/Quackademics_repo/detect-lane.sh &
-dt-exec bash /launch/Quackademics_repo/switch-control.sh
+dt-exec bash /launch/Quackademics_repo/detect-duckie.sh
+#dt-exec bash /launch/Quackademics_repo/detect-lane.sh &
+#dt-exec bash /launch/Quackademics_repo/switch-control.sh
 #dt-exec python3 -m "my_package.main"
 
 # ----------------------------------------------------------------------------

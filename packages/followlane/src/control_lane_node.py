@@ -9,42 +9,7 @@ import os
 from duckietown.dtros import DTROS, NodeType
 from switch_control_node import ControlType
 
-'''
-class pid():
-    def __init__(self):
-        self.Kp = 2     # P Anteil meist 2.0 - 4.0
-        self.Ki = 0     # I Anteil meist 0.0 - 0.5
-        self.Kd = 0     # D Anteil meist 0.1 - 1.0
-        self.dt = 0.1   # Zeitintervall
 
-        self.integral = 0   # sum of error (integral)
-        self.prev_error = 0 # Previous Error (on start == 0)
-
-    def update(self, error):
-        
-        if isinstance(error, numbers.Number) == False:
-            error = 0
-
-        P = error * self.Kp
-        
-        self.integral += error * self.dt
-        I = error * self.integral
-        
-        
-        if self.dt > 0.0:
-            derivative = (error - self.prev_error) / self.dt
-        else:
-            derivative = 0
-        
-
-        derivative = (error - self.prev_error) / self.dt if self.dt > 0 else 0.0
-
-        D = self.Kd * derivative
-
-        self.prev_error = error     # save last error
-
-        return P+I+D
-'''
 class ControlLaneNode(DTROS):
     def __init__(self,node_name):
         super(ControlLaneNode, self).__init__(node_name=node_name, node_type=NodeType.GENERIC)
@@ -58,9 +23,9 @@ class ControlLaneNode(DTROS):
         self.sub_control = rospy.Subscriber(f"/{self._vehicle_name}/switch/control", Int32, self.cbControl , queue_size = 1)
         
         self.Kp = 2     # P Anteil meist 2.0 - 4.0
-        self.Ki = 0     # I Anteil meist 0.0 - 0.5
-        self.Kd = 0     # D Anteil meist 0.1 - 1.0
-        self.dt = 0.1   # Zeitintervall
+        self.Ki = 0.1    # I Anteil meist 0.0 - 0.5
+        self.Kd = 0.1     # D Anteil meist 0.1 - 1.0
+        self.dt = 0.3   # Zeitintervall
 
         self.integral = 0   # sum of error (integral)
         self.prev_error = 0 # Previous Error (on start == 0)
@@ -84,33 +49,20 @@ class ControlLaneNode(DTROS):
 
     def followLane(self, center):
         # TODO write here your PID controler
-        print("center: ", center)
-        error = -(center - 50) / 100 # ? why -500?
-        #print("error: ", error)
+        error = (center - 50) / 100
 
-        if isinstance(error, numbers.Number) == False:
-            error = 0
-        #print("center is number: ", isinstance(error, numbers.Number))
         P = error * self.Kp
+
         self.integral += error * self.dt
         I = self.Ki * self.integral
-        '''
-        if self.dt > 0.0:
-            derivative = (error - self.prev_error) / self.dt
-        else:
-            derivative = 0
-        '''
 
         derivative = (error - self.prev_error) / self.dt if self.dt > 0 else 0.0
-
         D = self.Kd * derivative
         self.prev_error = error     # save last error
-    
-        a = P
-
-        v = 0.2
-        #a = pid.update(self, error)
         
+        a = P + I + D
+        v = 0.2
+
         twist = Twist2DStamped(v=v, omega=a)
         print(f'moving {v} {a} error {error}')
         self.pub_cmd_vel.publish(twist)
