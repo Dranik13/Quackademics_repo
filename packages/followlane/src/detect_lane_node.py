@@ -29,23 +29,23 @@ class DetectLaneNode(DTROS):
 
         self.counter = 0
 
-    def crop_img(self,img):
+    def transformToBirdsView(self,img):
         img = img.copy()
 
-        pts1 = np.float32([
-            [self.conf['lane_image']['top_left_x'],     self.conf['lane_image']['top_left_y']],
-            [self.conf['lane_image']['top_right_x'],    self.conf['lane_image']['top_right_y']],
-            [self.conf['lane_image']['bottom_right_x'], self.conf['lane_image']['bottom_right_y']],
-            [self.conf['lane_image']['bottom_left_x'],  self.conf['lane_image']['bottom_left_y']],])
+        img_cropped = img[180:400, 140:500]
         
-        pts2 = np.float32([[0,0],[100,0],[0,100],[100,100]])
-
-        M = cv2.getPerspectiveTransform(pts1,pts2)
-        return cv2.warpPerspective(img,M,(100,100))
+        transform_matrix = np.array([
+            [380.0, -166.8930938220217, -18181.75967957761],
+            [0.0, 40.36028149569993, 6290.369035473008],
+            [0.0, -0.9271838545667874, 278.9902240023466]
+            ])
+        
+        # perform birds-eye-transformation
+        return cv2.warpPerspective(img_cropped, transform_matrix, 
+                                            (img_cropped.shape[1], img_cropped.shape[0]), 
+                                            flags=cv2.INTER_CUBIC | cv2.WARP_INVERSE_MAP)
 
     def cbFindLane(self, image_msg):
-
-        # ? every third image will be used???
 
         if self.counter % 3 != 0:
             self.counter += 1
@@ -53,66 +53,80 @@ class DetectLaneNode(DTROS):
         else:
             self.counter += 1
 
-        # TODO Write your own Code for Lane detection here
-
         np_arr = np.frombuffer(image_msg.data, np.uint8)
         cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-        img = self.crop_img(cv_image)
+        bv_img = self.transformToBirdsView(cv_image)
 
-        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-
+        hsv = cv2.cvtColor(bv_img, cv2.COLOR_BGR2HSV)
+        
+        # create masks for yellow and white pixels
         mask_yellow = cv2.inRange(hsv, 
-                           (self.hue_yellow_l,self.saturation_yellow_l, self.lightness_yellow_l), 
+                           (self.hue_yellow_l,self.saturation_yellow_l, self.lightness_yellow_l),
                            (self.hue_yellow_h,self.saturation_yellow_h, self.lightness_yellow_h),)
         
         mask_white = cv2.inRange(hsv, 
                            (self.hue_white_l,self.saturation_white_l, self.lightness_white_l), 
                            (self.hue_white_h,self.saturation_white_h, self.lightness_white_h),)
 
-
-        # Koordinaten der gelben und weißen Bereiche
+        # get coordinates of yellow pixels
         coords_yellow = np.where(mask_yellow != 0)
-        coords_white = np.where(mask_white != 0)
-        
-        # Berechne Mittelwerte (Mitte der jeweiligen Masken)
-        if coords_white[0].size > 0:
-            center_y_white = np.mean(coords_white[0])
-            center_x_white = np.mean(coords_white[1])
-            center_white = (int(center_x_white), int(center_y_white))
-            print("center_white: ", center_x_white)
 
+        # calc the middelpoint of yellow pixels
+        center_x_yellow = None
         if coords_yellow[0].size > 0:
             center_y_yellow = np.mean(coords_yellow[0])
             center_x_yellow = np.mean(coords_yellow[1])
             center_yellow = (int(center_x_yellow), int(center_y_yellow))
-            print("center_yellow: ", center_x_yellow)
             
 
-        '''
-        #print("mask_white: ", mask_white)
-        #print("mask_yellow: ", mask_yellow)
-        center_white = np.mean(np.where(mask_white != 0))
-        center_yellow = np.mean(np.where(mask_yellow != 0))
-        '''
+
         msg_desired_center = Float64()
-        # unterscheidung welche Linie erkannt wird
-        
-        if coords_white[0].size > 0 and coords_yellow[0].size > 0:
-            msg_desired_center.data = center_x_yellow + (center_x_white - center_x_yellow)/2
-        elif coords_white[0].size > 0:
-            msg_desired_center.data = center_x_white
-        elif coords_yellow[0].size > 0:
-            msg_desired_center.data = center_x_yellow
-        else:
-            msg_desired_center.data = 50
+
+        if center_x_yellow != None:
+
+            ##### Get the right white line #####
+
+            # get coordinates of white pixels on the right side of the middle line
+            coords_r_line = np.nonzero((mask_white != 0) & (np.arange(mask_white.shape[1])[None, :] > center_x_yellow))
+
+            if coords_r_line[0].size > 0:
+                center_line_r_y = np.mean(coords_r_line[0])
+                center_line_r_x = np.mean(coords_r_line[1])
+                center_white = (int(center_line_r_x), int(center_line_r_y))
+
+            else:
+                center_line_r_x = center_x_yellow + 100
+                print("\033[93mNo Points for right line found. Orientate only on middle line!\033[0m")
+
+            msg_desired_center.data = abs(center_x_yellow - center_line_r_x) / 2 + center_x_yellow
 
         
-        #msg_desired_center.data = (center_white + center_yellow) / 2
-        
-        
-        print("msg_desired_center: ", msg_desired_center.data)
         self.pub_lane.publish(msg_desired_center)
-        #self.print_center(msg_desired_center.data, image_msg)
+
+        ################# Terminal and Image ouputs #################
+        if self.show_line_coordinates == True:
+            print("center_white: ", center_line_r_x)
+            print("center_yellow: ", center_x_yellow)
+            print("msg_desired_center: ", msg_desired_center.data)
+
+        if self.show_input_img == True:
+            cv2.imshow("camera", cv_image)
+            cv2.waitKey(1)
+
+        if self.show_output_img == True:
+            # Sicherstellen, dass center_y_yellow gültig ist
+            if center_y_yellow is not None and msg_desired_center.data is not None:
+                desired_point = (int(msg_desired_center.data), int(center_y_yellow))
+                cv2.circle(bv_img, desired_point, radius=2, color=(0, 255, 0), thickness=-1)
+            else:
+                rospy.logwarn("Invalid desired_point: msg_desired_center.data or center_y_yellow is None")
+            # Berechne Mittelwerte (Mitte der jeweiligen Masken)
+            cv2.circle(bv_img, center_white, radius=2, color=(255, 0, 0), thickness=-1)     # blue
+            cv2.circle(bv_img, center_yellow, radius=2, color=(0, 255, 255), thickness=-1)  # yellow
+            cv2.circle(bv_img, desired_point, radius=2, color=(0, 255, 0), thickness=-1)    # green
+
+            cv2.imshow("line detection", bv_img)
+            cv2.waitKey(1)
 
     def load_conf(self,path):
 
@@ -141,8 +155,11 @@ class DetectLaneNode(DTROS):
         self.saturation_duck_h =  self.conf['duck']['sh']
         self.lightness_duck_l =  self.conf['duck']['vl']
         self.lightness_duck_h =  self.conf['duck']['vh']
-            
-        
+
+        self.show_line_coordinates = self.conf['debugging_output']['line_coordinates']
+        self.show_input_img = self.conf['debugging_output']['input_image']
+        self.show_output_img = self.conf['debugging_output']['output_image']
+
 if __name__ == '__main__':
 
     node = DetectLaneNode(node_name='detect_lane_node')
