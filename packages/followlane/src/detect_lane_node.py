@@ -24,7 +24,6 @@ class DetectLaneNode(DTROS):
         self.sub_image_original = rospy.Subscriber(self._camera_topic, CompressedImage, self.cbFindLane, queue_size = 1)
 
         self.pub_lane = rospy.Publisher(f'/{self._vehicle_name}/detect/lane', Float64, queue_size = 1)
-        self.pub_lane_img = rospy.Publisher(f"/{self._vehicle_name}/camera_node/image/LaneCenter", Image, queue_size = 1)
 
         self._bridge = CvBridge()
 
@@ -100,7 +99,6 @@ class DetectLaneNode(DTROS):
                 print("\033[93mNo Points for right line found. Orientate only on middle line!\033[0m")
 
             msg_desired_center.data = abs(center_x_yellow - center_line_r_x) / 2 + center_x_yellow
-
 
         
         self.pub_lane.publish(msg_desired_center)

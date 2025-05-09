@@ -3,7 +3,6 @@
 import rospy
 from std_msgs.msg import Float64, Int32
 from enum import Enum
-
 import os
 from duckietown.dtros import DTROS, NodeType
 
@@ -26,17 +25,17 @@ class SwitchControlNode(DTROS):
 
 
     def cbDuckieDetected(self, msg):
-        print('received message DuckieDetected')
-        # TODO Write your own code here
-        # ? Change Mode to Duckie if Duckie is detected and lock it for X time?
-        #self._control_mode = ControlType.Obstacle
+        # Change Mode to Duckie if Duckie is detected and lock it for X time?
+        if msg.data > 0:
+            self._control_mode = ControlType.Obstacle
+        else:
+            self._control_mode = ControlType.Lane
 
     def cbLaneDetected(self, msg):
-        #print('received message LaneDetected')
-        # TODO Write your own code here
-        # ? Change control Mode if Lane Detected and no Duckie
-        #self._control_mode = ControlType.Lane
-        pass
+        # Change control Mode if Lane Detected and no Duckie
+        if msg.data > 0 and self._control_mode != ControlType.Obstacle:
+            self._control_mode = ControlType.Lane
+        
 
     def run(self):
         rate = rospy.Rate(10)

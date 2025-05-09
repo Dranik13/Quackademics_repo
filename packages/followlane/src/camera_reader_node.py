@@ -21,8 +21,9 @@ class CameraReaderNode(DTROS):
         self._vehicle_name = os.environ['VEHICLE_NAME']
         
         self._camera_topic = f"/{self._vehicle_name}/camera_node/image/compressed"
-        self._camera_topic_send = f"/{self._vehicle_name}/camera_node/image/Colors"
-        # construct subscriber
+        self._camera_topic_send = f"/{self._vehicle_name}/camera_node/image/Result"
+        self._camera_topic_send1 = f"/{self._vehicle_name}/camera_node/image/MeanLanes"
+        self._camera_topic_send2 = f"/{self._vehicle_name}/camera_node/image/crop_area"
         
         self.load_conf('packages/followlane/config/detect_lane.yaml')
         
@@ -30,22 +31,25 @@ class CameraReaderNode(DTROS):
         self._bridge = CvBridge()
         
         # create window
-        self._window = "camera-reader"
-        #self._window2 = "camera-reader2"
-        '''
+        #self._window = "camera-reader"
+        
         with open('packages/followlane/config/detect_lane.yaml','r') as f:
             text = f.read()
         
         self.conf = yaml.safe_load(text)
         
-        self.names = ['white','yellow','duck','lane image']
-        self.name = self.names[0]
-        '''
+        #self.names = ['white','yellow','duck','lane image']
+        #self.name = self.names[3]
+        
         #cv2.namedWindow(self._window, cv2.WINDOW_AUTOSIZE)
-        #cv2.namedWindow(self._window2, cv2.WINDOW_AUTOSIZE)
         #self.createWindow(0)
+
+        # construct subscriber
         self.sub = rospy.Subscriber(self._camera_topic, CompressedImage, self.callback)
-        self.pub = rospy.Publisher(self._camera_topic_send, Image, queue_size = 1)
+        self.pub_result = rospy.Publisher(self._camera_topic_send, Image, queue_size = 1)
+        self.pub_circle = rospy.Publisher(self._camera_topic_send1, Image, queue_size = 1)
+        self.pub_crop_area = rospy.Publisher(self._camera_topic_send2, Image, queue_size = 1)
+
         #rospy.on_shutdown(self.fnShutDown)
         
 
@@ -54,7 +58,7 @@ class CameraReaderNode(DTROS):
 
         # Bild zuschneiden
         img_cropped = img[180:400, 140:500]
-        
+
         transform_matrix = np.array([
             [380.0, -166.8930938220217, -18181.75967957761],
             [0.0, 40.36028149569993, 6290.369035473008],
@@ -95,8 +99,8 @@ class CameraReaderNode(DTROS):
         with open('packages/followlane/config/detect_lane.yaml','w') as f:
             f.write(text)
             print('written in yaml')
-
         print(text)
+
 
     def callback(self, msg):
 
@@ -125,7 +129,6 @@ class CameraReaderNode(DTROS):
         # Weiße Maskenkonturen extrahieren
         contours_white, _ = cv2.findContours(mask_white, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         img_copy = img.copy()
-        #img_copy = cv2.cvtColor(img_copy, cv2.COLOR_RGB2GRAY)
         # Gelbe Konturen einzeichnen (z.B. mit Farbe Gelb)
         cv2.drawContours(img_copy, contours_yellow, -1, (0, 0, 255), 1)  # Gelb
 
@@ -156,36 +159,35 @@ class CameraReaderNode(DTROS):
         result_resized = cv2.resize(result, (400, 400))
 
         # Publish bearbeitetes Bild
-        ros_img = self._bridge.cv2_to_imgmsg(img_circle_resized, encoding="bgr8")
-        self.pub.publish(ros_img)
+        ros_img_result = self._bridge.cv2_to_imgmsg(result_resized, encoding="bgr8")
+        self.pub_result.publish(ros_img_result)
+        ros_img_circle = self._bridge.cv2_to_imgmsg(img_circle_resized, encoding="bgr8")
+        self.pub_circle.publish(ros_img_circle)
 
+        '''
         cv2.imshow("Result", result_resized)
         cv2.imshow("Center Lanes", img_circle_resized)
         cv2.imshow("Detected Lanes", img_resized)
         cv2.imshow("camera", image)
         cv2.waitKey(1)
-    
         '''
-        if self.name == 'lane image':
-            for slider_name in ['top_left_x','top_left_y','top_right_x','top_right_y','bottom_left_x','bottom_left_y','bottom_right_x','bottom_right_y']:
-                self.conf['lane_image'][slider_name] = cv2.getTrackbarPos(slider_name, self._window) 
 
-            x_alt = 0
-            y_alt = 0
-            for point in ['top_left','top_right','bottom_left','bottom_right','top_left']:
-                x = self.conf['lane_image'][f'{point}_x']
-                y = self.conf['lane_image'][f'{point}_y']
+        # show crop area
+        x_alt = 0
+        y_alt = 0
+        for point in ['top_left','top_right','bottom_left','bottom_right','top_left']:
+            x = self.conf['lane_image'][f'{point}_x']
+            y = self.conf['lane_image'][f'{point}_y']
 
-                if x_alt != 0 or y_alt != 0:
-                    image = cv2.line(image,(x_alt,y_alt),(x,y),(255,255,255),2 )
+            if x_alt != 0 or y_alt != 0:
+                image = cv2.line(image,(x_alt,y_alt),(x,y),(255,255,255),2 )
 
-                x_alt = x
-                y_alt = y
-                
-
-            cv2.imshow(self._window, image)
-            cv2.waitKey(1)
-            return
+            x_alt = x
+            y_alt = y
+        
+        ros_img_2 = self._bridge.cv2_to_imgmsg(image, encoding="bgr8")
+        self.pub_crop_area.publish(ros_img_2)
+        '''
         self.conf[self.name]['hl'] = cv2.getTrackbarPos('hl', self._window) 
         self.conf[self.name]['hh'] = cv2.getTrackbarPos('hh', self._window)  
         self.conf[self.name]['sl'] = cv2.getTrackbarPos('sl', self._window) 
@@ -202,22 +204,29 @@ class CameraReaderNode(DTROS):
                            (self._hl,self._sl, self._vl), 
                            (self._hh,self._sh, self._vh),)
         image = cv2.putText(image,self.name,(100,100),cv2.QT_FONT_NORMAL, 2, (255,255,255), 2)
-
+'''
+        
     def fnShutDown(self):
         print("fnShutDown")
         text = yaml.safe_dump(self.conf)
         with open('packages/followlane/config/detect_lane.yaml','w') as f:
             f.write(text)
             print('written in yaml')
-
         print(text)
     
+
     def createWindow(self,x):
         
-        cv2.destroyAllWindows()
-        print('destroyed')
-        cv2.namedWindow(self._window, cv2.WINDOW_AUTOSIZE)
-        print('new window')
+        #cv2.destroyAllWindows()
+        #print('destroyed')
+        #cv2.namedWindow(self._window, cv2.WINDOW_AUTOSIZE)
+        #print('new window')
+
+        if cv2.getWindowProperty(self._window, cv2.WND_PROP_VISIBLE) < 1:
+            cv2.namedWindow(self._window, cv2.WINDOW_AUTOSIZE)
+            print('New window created')
+        else:
+            print('Window already exists')
 
         changeName = lambda x : self.changeName(x)
         cv2.createTrackbar('color',self._window,0,len(self.names) -1, changeName)
@@ -255,12 +264,7 @@ class CameraReaderNode(DTROS):
 
             cv2.createTrackbar('vh', self._window, 0, 255, nothing)
             cv2.setTrackbarPos('vh',self._window,self._vh)
-
-
-def nothing(x):
-    pass
-'''
-
+            
 
     def load_conf(self,path):
 
@@ -289,7 +293,11 @@ def nothing(x):
         self.saturation_duck_h =  self.conf['duck']['sh']
         self.lightness_duck_l =  self.conf['duck']['vl']
         self.lightness_duck_h =  self.conf['duck']['vh']
-            
+
+
+def nothing(x):
+    pass            
+
 
 if __name__ == '__main__':
     # create the node
