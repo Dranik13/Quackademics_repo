@@ -24,7 +24,6 @@ class DetectLaneNode(DTROS):
         self.sub_image_original = rospy.Subscriber(self._camera_topic, CompressedImage, self.cbFindLane, queue_size = 1)
 
         self.pub_lane = rospy.Publisher(f'/{self._vehicle_name}/detect/lane', Float64, queue_size = 1)
-        self.pub_lane_img = rospy.Publisher(f"/{self._vehicle_name}/camera_node/image/LaneCenter", Image, queue_size = 1)
 
         self._bridge = CvBridge()
 
@@ -99,7 +98,7 @@ class DetectLaneNode(DTROS):
         # unterscheidung welche Linie erkannt wird
         
         if coords_white[0].size > 0 and coords_yellow[0].size > 0:
-            msg_desired_center.data = (center_x_white + center_x_yellow) / 2
+            msg_desired_center.data = center_x_yellow + (center_x_white - center_x_yellow)/2
         elif coords_white[0].size > 0:
             msg_desired_center.data = center_x_white
         elif coords_yellow[0].size > 0:
@@ -114,15 +113,6 @@ class DetectLaneNode(DTROS):
         print("msg_desired_center: ", msg_desired_center.data)
         self.pub_lane.publish(msg_desired_center)
         #self.print_center(msg_desired_center.data, image_msg)
-
-    def print_center(self, center, image_msg):
-        img = self._bridge.compressed_imgmsg_to_cv2(image_msg)
-        point = (center, 20)
-        cv2.circle(img, point, radius=5, color=(0, 0, 255), thickness=-1)
-        
-        ros_img = self._bridge.cv2_to_imgmsg(img, encoding="bgr8")
-        
-        self.pub_lane_img(ros_img)
 
     def load_conf(self,path):
 
