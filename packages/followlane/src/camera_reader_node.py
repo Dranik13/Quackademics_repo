@@ -52,16 +52,19 @@ class CameraReaderNode(DTROS):
     def crop_img(self,img):
         img = img.copy()
 
-        pts1 = np.float32([
-            [self.conf['lane_image']['top_left_x'],     self.conf['lane_image']['top_left_y']],
-            [self.conf['lane_image']['top_right_x'],    self.conf['lane_image']['top_right_y']],
-            [self.conf['lane_image']['bottom_right_x'], self.conf['lane_image']['bottom_right_y']],
-            [self.conf['lane_image']['bottom_left_x'],  self.conf['lane_image']['bottom_left_y']],])
+        # Bild zuschneiden
+        img_cropped = img[180:400, 140:500]
         
-        pts2 = np.float32([[0,0],[100,0],[0,100],[100,100]])
-
-        M = cv2.getPerspectiveTransform(pts1,pts2)
-        return cv2.warpPerspective(img,M,(100,100))
+        transform_matrix = np.array([
+            [380.0, -166.8930938220217, -18181.75967957761],
+            [0.0, 40.36028149569993, 6290.369035473008],
+            [0.0, -0.9271838545667874, 278.9902240023466]
+            ])
+        
+        # perform Birds-Eye-transformation
+        return cv2.warpPerspective(img_cropped, transform_matrix, 
+                                            (img_cropped.shape[1], img_cropped.shape[0]), 
+                                            flags=cv2.INTER_CUBIC | cv2.WARP_INVERSE_MAP)
     '''
     #def on_change_hl(self,val):
     #    self._hl = val
