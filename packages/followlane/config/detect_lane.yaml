@@ -28,7 +28,7 @@ yellow:
   sl: 80
   vh: 255
   vl: 100
-  debugging_output:
+debugging_output:
   line_coordinates: false
   input_image: true
   output_image: true
