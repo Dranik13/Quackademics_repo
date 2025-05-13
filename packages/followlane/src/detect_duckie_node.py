@@ -7,7 +7,7 @@ import os
 from duckietown.dtros import DTROS, NodeType
 from sensor_msgs.msg import CompressedImage, Image
 from ultralytics import YOLO
-import onnxruntime as ort
+# import onnxruntime as ort
 from std_msgs.msg import Float64
 from cv_bridge import CvBridge
 import yaml
@@ -18,7 +18,7 @@ class DetectDuckieNode(DTROS):
         # initialize the DTROS parent class
         super(DetectDuckieNode, self).__init__(node_name=node_name, node_type=NodeType.VISUALIZATION)
         self._model = YOLO("packages/followlane/assets/model.pt")
-        self.model_ort = ort.InferenceSession("packages/followlane/assets/best.onnx")
+        # self.model_ort = ort.InferenceSession("packages/followlane/assets/best.onnx")
         self.load_conf('packages/followlane/config/detect_lane.yaml')
         self._vehicle_name = os.environ['VEHICLE_NAME']
         # Subscriber camera
@@ -47,10 +47,10 @@ class DetectDuckieNode(DTROS):
 
         cv_image = cv2.resize(cv_image, (416,416))
 
-        #results = self._model(cv_image) #, classes=)
-        input_name = self.model_ort.get_inputs()[0].name
-        outputs = self.model_ort.run(None, {input_name: cv_image})
-        results = outputs[0]
+        results = self._model(cv_image) #, classes=)
+        # input_name = self.model_ort.get_inputs()[0].name
+        # outputs = self.model_ort.run(None, {input_name: cv_image})
+        # results = outputs[0]
 
         pts1 = np.float32([
             [self.conf['lane_image']['top_left_x'],     self.conf['lane_image']['top_left_y']],
@@ -104,13 +104,6 @@ def is_object_in_path(results, img, pts1):
     return object_in_path
 
 def draw_bounding_boxes(results,img):
-    for detection in results:
-        x1, y1, x2, y2, conf, cls = detection[:6]
-        if conf > 0.5:  # Schwellenwert für Zuverlässigkeit
-            cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
-            cv2.putText(img, f"Objekt {int(cls)}: {conf:.2f}", (int(x1), int(y1) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
-    '''
     for result in results:
         for box in result.boxes:
             cv2.rectangle(img, (int(box.xyxy[0][0]), int(box.xyxy[0][1])),
@@ -118,7 +111,6 @@ def draw_bounding_boxes(results,img):
             cv2.putText(img, f"{result.names[int(box.cls[0])]}",
                         (int(box.xyxy[0][0]), int(box.xyxy[0][1]) - 10),
                         cv2.FONT_HERSHEY_PLAIN, 1, (255, 0, 0), 5)
-    '''
     return img
 
 

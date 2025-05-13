@@ -73,6 +73,7 @@ class DetectLaneNode(DTROS):
 
         # calc the middelpoint of yellow pixels
         center_x_yellow = None
+        center_y_yellow = None
         if coords_yellow[0].size > 0:
             center_y_yellow = np.mean(coords_yellow[0])
             center_x_yellow = np.mean(coords_yellow[1])
@@ -81,7 +82,7 @@ class DetectLaneNode(DTROS):
 
 
         msg_desired_center = Float64()
-
+        center_white = None
         if center_x_yellow != None:
 
             ##### Get the right white line #####
@@ -96,12 +97,28 @@ class DetectLaneNode(DTROS):
 
             else:
                 center_line_r_x = center_x_yellow + 100
-                print("\033[93mNo Points for right line found. Orientate only on middle line!\033[0m")
+                rospy.logwarn("No Points for right line found. Orientate only on middle line")
 
             msg_desired_center.data = abs(center_x_yellow - center_line_r_x) / 2 + center_x_yellow
 
         
-        self.pub_lane.publish(msg_desired_center)
+        ################# if no middle line can be detected, orientate on the right line #################
+        else:
+            # get coordinates of white pixels in the entire image
+            coords_r_line = np.where(mask_white != 0)
+            if coords_r_line[0].size > 0:
+                center_line_r_y = np.mean(coords_r_line[0])
+                center_line_r_x = np.mean(coords_r_line[1])
+                center_white = (int(center_line_r_x), int(center_line_r_y))
+                msg_desired_center.data = center_line_r_x - 80
+
+            else:
+                msg_desired_center.data = None
+                rospy.logerr("NO LINES FOUND FOR LINEDETECTION")
+
+            
+        if msg_desired_center.data != None:
+            self.pub_lane.publish(msg_desired_center)
 
         ################# Terminal and Image ouputs #################
         if self.show_line_coordinates == True:
@@ -112,18 +129,18 @@ class DetectLaneNode(DTROS):
         if self.show_input_img == True:
             cv2.imshow("camera", cv_image)
             cv2.waitKey(1)
-
+        
         if self.show_output_img == True:
-            # Sicherstellen, dass center_y_yellow gültig ist
             if center_y_yellow is not None and msg_desired_center.data is not None:
                 desired_point = (int(msg_desired_center.data), int(center_y_yellow))
-                cv2.circle(bv_img, desired_point, radius=2, color=(0, 255, 0), thickness=-1)
-            else:
-                rospy.logwarn("Invalid desired_point: msg_desired_center.data or center_y_yellow is None")
-            # Berechne Mittelwerte (Mitte der jeweiligen Masken)
-            cv2.circle(bv_img, center_white, radius=2, color=(255, 0, 0), thickness=-1)     # blue
-            cv2.circle(bv_img, center_yellow, radius=2, color=(0, 255, 255), thickness=-1)  # yellow
-            cv2.circle(bv_img, desired_point, radius=2, color=(0, 255, 0), thickness=-1)    # green
+                cv2.circle(bv_img, center_yellow, radius=2, color=(0, 255, 255), thickness=-1)  # yellow
+                cv2.circle(bv_img, center_white, radius=2, color=(255, 0, 0), thickness=-1)     # blue
+                cv2.circle(bv_img, desired_point, radius=2, color=(0, 255, 0), thickness=-1)    # green
+
+            elif center_white != None:
+                desired_point = (int(msg_desired_center.data), int(center_line_r_y))
+                cv2.circle(bv_img, center_white, radius=2, color=(255, 0, 0), thickness=-1)     # blue
+                cv2.circle(bv_img, desired_point, radius=2, color=(0, 255, 0), thickness=-1)    # green
 
             cv2.imshow("line detection", bv_img)
             cv2.waitKey(1)
