@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 
 import rospy
-from std_msgs.msg import Float64, Int32
+from std_msgs.msg import Float64, Int32, Bool
 from enum import Enum
 from sensor_msgs.msg import Image
 from duckietown_msgs.msg import Twist2DStamped
 import os
 from duckietown.dtros import DTROS, NodeType
 from switch_control_node import ControlType
+
+class ObstacleMode(Enum):
+    Stop = 0
+    Spin = 1
+    Move = 2
+
 
 class ControlObstacleNode(DTROS):
     def __init__(self,node_name):
@@ -22,28 +28,46 @@ class ControlObstacleNode(DTROS):
         self._yolo_topic = f"/{self._vehicle_name}/detect/duckie/image"
         self.sub_image = rospy.Subscriber(self._yolo_topic,Image,queue_size = 1)
         # Subscribe Duckie
-        self.sub_duckie = rospy.Subscriber(f"/{self._vehicle_name}/detect/duckie", Float64, self.cbAvoideObstacle, queue_size = 1)
+        self.sub_duckie = rospy.Subscriber(f"/{self._vehicle_name}/detect/duckie", Bool, self.cbAvoideObstacle, queue_size = 1)
         # Subscribe control
         self.sub_control = rospy.Subscriber(f"/{self._vehicle_name}/switch/control", Int32, self.cbControl, queue_size = 1)
-        
+        self._control_mode = ObstacleMode.Stop
+        self.counter = 0
         rospy.on_shutdown(self.fnShutDown)
 
     def cbControl(self,msg):
-        if msg.data == ControlType.Obstacle.value:
+        if msg.data == ControlType.Obstacle.value and self._control_mode == ObstacleMode.Stop:
             self.enable = True
-        
-        else:
+        elif msg.data != ControlType.Obstacle.value and self._control_mode == ObstacleMode.Stop:
             self.enable = False
 
     def cbAvoideObstacle(self, msg):
-        print('received message')
-
+        print("enable: ", self.enable)
+        print("counter: ", self.counter)
+        #print("mode: ", self._control_mode)
+        print("msg.data: ", msg.data)
         if not self.enable:
+            twist = Twist2DStamped(v=0, omega=0)
+            self.pub_cmd_vel.publish(twist)
             return
         
-        # Write your code for Obstacle Avoidance here
+        if self._control_mode == ObstacleMode.Spin:
+            twist = Twist2DStamped(v=0, omega=0.5)
+            self.pub_cmd_vel.publish(twist)
         
+        if self._control_mode == ObstacleMode.Move:
+            twist = Twist2DStamped(v=0.2, omega=0)
+            self.pub_cmd_vel.publish(twist)
+            self.counter += 1
         
+        if msg.data:
+            self._control_mode = ObstacleMode.Spin
+        else:
+            self._control_mode = ObstacleMode.Move
+        print("mode: ", self._control_mode)
+        if self.counter == 5:
+            self._control_mode = ObstacleMode.Stop
+            self.counter = 0
 
     def fnShutDown(self):
         rospy.loginfo("Shutting down. cmd_vel will be 0")
