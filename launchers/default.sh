@@ -13,7 +13,7 @@ dt-launchfile-init
 
 # launching app
 #echo "Inhalt dieses Verzeichnisses:"
-#ls -l "$(dirname "$0")/"
+#ls -l "$(dirname "$0")"
 
 # dt-exec bash /launch/Quackademics_repo/camera-reader.sh &
 dt-exec bash /launch/Quackademics_repo/control-lane.sh &

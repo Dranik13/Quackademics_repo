@@ -3,7 +3,6 @@
 import rospy
 from std_msgs.msg import Float64, Int32
 import numbers
-
 from duckietown_msgs.msg import Twist2DStamped
 import os
 from duckietown.dtros import DTROS, NodeType
@@ -35,7 +34,6 @@ class ControlLaneNode(DTROS):
     def cbControl(self,msg):
         if msg.data == ControlType.Lane.value:
             self.enable = True
-        
         else:
             self.enable = False
 
