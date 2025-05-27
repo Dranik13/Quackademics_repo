@@ -1,7 +1,7 @@
 # parameters
 ARG REPO_NAME="Quackademics_repo"
-ARG DESCRIPTION="Robogistics"
-ARG MAINTAINER="Quackademics"
+ARG DESCRIPTION="Duckiebot Project"
+ARG MAINTAINER="Dennis McNab(mcde1011), Robin Mann(maro1026), Jan Luca Frank (frja1024), Anton Kisel(kian1022)"
 # pick an icon from: https://fontawesome.com/v4.7.0/icons/
 ARG ICON="cube"
 
@@ -15,7 +15,7 @@ ARG BASE_TAG=${DISTRO}-${ARCH}
 ARG LAUNCHER=default
 
 # define base image
-FROM ${DOCKER_REGISTRY}/duckietown/${BASE_IMAGE}:${BASE_TAG} as base
+FROM ${DOCKER_REGISTRY}/duckietown/${BASE_IMAGE}:${BASE_TAG} AS base
 
 # recall all arguments
 ARG DISTRO

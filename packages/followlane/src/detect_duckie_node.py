@@ -8,6 +8,7 @@ from duckietown.dtros import DTROS, NodeType
 from sensor_msgs.msg import CompressedImage, Image
 from ultralytics import YOLO
 from std_msgs.msg import Float64, Bool
+
 from cv_bridge import CvBridge
 import yaml
 
@@ -17,7 +18,7 @@ class DetectDuckieNode(DTROS):
         # initialize the DTROS parent class
         super(DetectDuckieNode, self).__init__(node_name=node_name, node_type=NodeType.VISUALIZATION)
         self._model = YOLO("packages/followlane/assets/model.pt")
-        #self.model_ort = ort.InferenceSession("packages/followlane/assets/best.onnx")
+
         self.load_conf('packages/followlane/config/detect_lane.yaml')
         self._vehicle_name = os.environ['VEHICLE_NAME']
         # Subscriber camera
@@ -45,6 +46,7 @@ class DetectDuckieNode(DTROS):
         cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
         results = self._model(cv_image)
+
 
         pts1 = np.float32([
             [self.conf['lane_image']['top_left_x'],     self.conf['lane_image']['top_left_y']],
