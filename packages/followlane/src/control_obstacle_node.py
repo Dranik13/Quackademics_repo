@@ -31,6 +31,7 @@ class ControlObstacleNode(DTROS):
         self.sub_duckie = rospy.Subscriber(f"/{self._vehicle_name}/detect/duckie", Bool, self.cbAvoideObstacle, queue_size = 1)
         # Subscribe control
         self.sub_control = rospy.Subscriber(f"/{self._vehicle_name}/switch/control", Int32, self.cbControl, queue_size = 1)
+        self.pub_Obstacle_enabled = rospy.Publisher(f"/{self._vehicle_name}/obstacle/enabled", Bool, queue_size = 1)
         self._control_mode = ObstacleMode.Stop
         self.counter = 0
         rospy.on_shutdown(self.fnShutDown)
@@ -40,19 +41,18 @@ class ControlObstacleNode(DTROS):
             self.enable = True
         elif msg.data != ControlType.Obstacle.value and self._control_mode == ObstacleMode.Stop:
             self.enable = False
+        msg = self.enable
+        self.pub_Obstacle_enabled.publish(msg)
 
     def cbAvoideObstacle(self, msg):
-        print("enable: ", self.enable)
-        print("counter: ", self.counter)
-        #print("mode: ", self._control_mode)
-        print("msg.data: ", msg.data)
+        
         if not self.enable:
             twist = Twist2DStamped(v=0, omega=0)
             self.pub_cmd_vel.publish(twist)
             return
         
         if self._control_mode == ObstacleMode.Spin:
-            twist = Twist2DStamped(v=0, omega=0.5)
+            twist = Twist2DStamped(v=0, omega=1)
             self.pub_cmd_vel.publish(twist)
         
         if self._control_mode == ObstacleMode.Move:
@@ -64,7 +64,7 @@ class ControlObstacleNode(DTROS):
             self._control_mode = ObstacleMode.Spin
         else:
             self._control_mode = ObstacleMode.Move
-        print("mode: ", self._control_mode)
+        
         if self.counter == 5:
             self._control_mode = ObstacleMode.Stop
             self.counter = 0

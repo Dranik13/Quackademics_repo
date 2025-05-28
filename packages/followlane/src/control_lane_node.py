@@ -62,7 +62,7 @@ class ControlLaneNode(DTROS):
         v = 0.2
 
         twist = Twist2DStamped(v=v, omega=a)
-        print(f'moving {v} {a} error {error}')
+        #print(f'moving {v} {a} error {error}')
         self.pub_cmd_vel.publish(twist)
 
 
