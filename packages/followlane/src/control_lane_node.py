@@ -56,8 +56,8 @@ class ControlLaneNode(DTROS):
         D = self.Kd * derivative
         self.prev_error = error     # save last error
         
-        print("I-Anteil", I)
-        print("D-Anteil", D)
+        #print("I-Anteil", I)
+        #print("D-Anteil", D)
         a = P + I + D
         v = 0.2
 

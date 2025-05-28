@@ -15,7 +15,7 @@ from cv_bridge import CvBridge
 from duckietown.dtros import DTROS, NodeType
 
 avoiding_obstacles = False
-toggle = False
+
 
 class DetectLaneNode(DTROS):
     def __init__(self, node_name):
@@ -35,6 +35,7 @@ class DetectLaneNode(DTROS):
         self._bridge = CvBridge()
 
         self.counter = 0
+        self.toggle = False
 
     def transformToBirdsView(self,img):
         img = img.copy()
@@ -63,7 +64,7 @@ class DetectLaneNode(DTROS):
         look_width = 500
 
         if avoiding_obstacles:
-            toggle = True
+            self.toggle = True
 
         if self.counter % 3 != 0:
             self.counter += 1
@@ -105,7 +106,7 @@ class DetectLaneNode(DTROS):
 
         # search for right line if a middle line was found
         if len(middle_pts) >= 2 and avoiding_obstacles == False:
-            toggle = False
+            self.toggle = False
             viewed_pt = 0
             sideline_pts = []
 
@@ -145,8 +146,8 @@ class DetectLaneNode(DTROS):
                 & (np.arange(mask_white.shape[1])[None, :] > width/4)
                 & (np.arange(mask_white.shape[0])[:, None] <= 80))
             
-            if toggle == False:
-                desired_centers.append((coords_r_line[0] + 60), coords_r_line[1])
+            if self.toggle == False:
+                desired_centers.append((coords_r_line[0] + 60, coords_r_line[1]))
                 
             
 
@@ -212,7 +213,8 @@ class DetectLaneNode(DTROS):
         #         rospy.logerr("NO LINES FOUND FOR LINEDETECTION")
 
         if desired_centers:
-            msg_desired_center.data = desired_centers[0][0]
+            msg_desired_center = Float64()
+            msg_desired_center.data = float(desired_centers[0][0])
             self.pub_lane.publish(msg_desired_center)
 
         # ################# Terminal and Image ouputs #################
