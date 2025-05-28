@@ -6,21 +6,21 @@ duck:
   vh: 255
   vl: 200
 lane_image:
-  bottom_left_x: 140
-  bottom_left_y: 580
+  bottom_left_x: 0
+  bottom_left_y: 480
   bottom_right_x: 640
-  bottom_right_y: 580
-  top_left_x: 140
+  bottom_right_y: 480
+  top_left_x: 0
   top_left_y: 180
   top_right_x: 640
   top_right_y: 180
 white:
   hh: 255
-  hl: 0
-  sh: 80
+  hl: 15
+  sh: 65
   sl: 0
   vh: 255
-  vl: 180
+  vl: 195
 yellow:
   hh: 80
   hl: 20
@@ -32,3 +32,5 @@ debugging_output:
   line_coordinates: false
   input_image: true
   output_image: true
+  mask_white: true
+  mask_yellow: true

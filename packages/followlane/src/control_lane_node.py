@@ -14,7 +14,7 @@ class ControlLaneNode(DTROS):
     def __init__(self,node_name):
         super(ControlLaneNode, self).__init__(node_name=node_name, node_type=NodeType.GENERIC)
         
-        self.enable = False
+        self.enable = True
         self._vehicle_name = os.environ['VEHICLE_NAME']
         twist_topic = f"/{self._vehicle_name}/car_cmd_switch_node/cmd"
         self.pub_cmd_vel = rospy.Publisher(twist_topic, Twist2DStamped, queue_size = 1)
@@ -22,10 +22,10 @@ class ControlLaneNode(DTROS):
         self.sub_lane = rospy.Subscriber(f'/{self._vehicle_name}/detect/lane', Float64, self.cbFollowLane, queue_size = 1)
         self.sub_control = rospy.Subscriber(f"/{self._vehicle_name}/switch/control", Int32, self.cbControl , queue_size = 1)
         
-        self.Kp = 2     # P Anteil meist 2.0 - 4.0
-        self.Ki = 0.1    # I Anteil meist 0.0 - 0.5
-        self.Kd = 0.1     # D Anteil meist 0.1 - 1.0
-        self.dt = 0.3   # Zeitintervall
+        self.Kp = 15     # P Anteil meist 2.0 - 4.0
+        self.Ki = 0.05   # I Anteil meist 0.0 - 0.5
+        self.Kd = 0     # D Anteil meist 0.1 - 1.0
+        self.dt = 0.1    # Zeitintervall
 
         self.integral = 0   # sum of error (integral)
         self.prev_error = 0 # Previous Error (on start == 0)
@@ -40,7 +40,6 @@ class ControlLaneNode(DTROS):
             self.enable = False
 
     def cbFollowLane(self, desired_center):
-
         if not self.enable:
             return        
         
@@ -48,9 +47,8 @@ class ControlLaneNode(DTROS):
         self.followLane(center)
 
     def followLane(self, center):
-        # TODO write here your PID controler
-        error = (center - 50) / 100
-
+        # Image has 360 Pixel
+        error = -(center - 180) / 360
         P = error * self.Kp
 
         self.integral += error * self.dt
@@ -60,6 +58,8 @@ class ControlLaneNode(DTROS):
         D = self.Kd * derivative
         self.prev_error = error     # save last error
         
+        print("I-Anteil", I)
+        print("D-Anteil", D)
         a = P + I + D
         v = 0.2
 
