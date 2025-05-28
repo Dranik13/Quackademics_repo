@@ -97,7 +97,7 @@ class DetectLaneNode(DTROS):
 
             else:
                 center_line_r_x = center_x_yellow + 100
-                rospy.logwarn("No Points for right line found. Orientate only on middle line")
+                #rospy.logwarn("No Points for right line found. Orientate only on middle line")
 
             msg_desired_center.data = abs(center_x_yellow - center_line_r_x) / 2 + center_x_yellow
 
@@ -114,7 +114,7 @@ class DetectLaneNode(DTROS):
 
             else:
                 msg_desired_center.data = None
-                rospy.logerr("NO LINES FOUND FOR LINEDETECTION")
+                #rospy.logerr("NO LINES FOUND FOR LINEDETECTION")
 
             
         if msg_desired_center.data != None:

@@ -20,30 +20,40 @@ class SwitchControlNode(DTROS):
         self.sub_duckie = rospy.Subscriber(f"/{self._vehicle_name}/detect/duckie", Bool, self.cbDuckieDetected, queue_size = 1)
         self.sub_lane = rospy.Subscriber(f"/{self._vehicle_name}/detect/lane", Float64, self.cbLaneDetected, queue_size = 1)
         self.pub_control = rospy.Publisher(f"/{self._vehicle_name}/switch/control", Int32, queue_size = 1)
+        self.sub_Obstacle_enabled = rospy.Subscriber(f"/{self._vehicle_name}/obstacle/enabled", Bool, self.cbObstacleEnabled, queue_size = 1)
         self._control_mode = ControlType.Lane   # start mode == Lane
+        self._Obstacle_enabled = False
+        self.counter = 0
 
-
+    def cbObstacleEnabled(self, msg):
+        self._Obstacle_enabled = msg.data
 
     def cbDuckieDetected(self, msg):
         # Change Mode to Duckie if Duckie is detected and lock it for X time?
         if msg.data:
             self._control_mode = ControlType.Obstacle
-        else:
+        elif self._Obstacle_enabled == False:
             self._control_mode = ControlType.Lane
 
     def cbLaneDetected(self, msg):
         # Change control Mode if Lane Detected and no Duckie
-        if msg.data > 0 and self._control_mode != ControlType.Obstacle:
+        if msg.data > 0 and self._Obstacle_enabled == False:
             self._control_mode = ControlType.Lane
         
 
     def run(self):
         rate = rospy.Rate(10)
+       
         while not rospy.is_shutdown():
-
+            if self.counter == 1000:
+                print("control_mode: ", self._control_mode)
+                self.counter = 0
+            else:
+                self.counter +=1
             msg_control = Int32()
             msg_control.data = self._control_mode.value
             self.pub_control.publish(msg_control)
+            
 
 if __name__ == '__main__':
     # create the node

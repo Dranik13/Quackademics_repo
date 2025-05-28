@@ -30,5 +30,5 @@ yellow:
   vl: 100
 debugging_output:
   line_coordinates: false
-  input_image: true
-  output_image: true
+  input_image: false
+  output_image: false
