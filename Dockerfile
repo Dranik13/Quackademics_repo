@@ -50,9 +50,18 @@ ENV DT_MODULE_TYPE="${REPO_NAME}" \
     DT_LAUNCH_PATH="${LAUNCH_PATH}" \
     DT_LAUNCHER="${LAUNCHER}"
 
+
+# PIP upgrade
+RUN python3 -m pip install --upgrade pip
+#RUN pip install --extra-index-url https://developer.download.nvidia.com/compute/redist/jp/v42/onnxruntime_gpu-1.7.0-cp38-cp38-linux_aarch64.whl
+#RUN pip install --extra-index-url https://developer.download.nvidia.com/compute/redist/jp/v42/ onnxruntime==1.7.0
+
+
 # install apt dependencies
 COPY ./dependencies-apt.txt "${REPO_PATH}/"
 RUN dt-apt-install ${REPO_PATH}/dependencies-apt.txt
+
+#RUN python3 --version
 
 # install python3 dependencies
 ARG PIP_INDEX_URL="https://pypi.org/simple"

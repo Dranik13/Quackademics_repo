@@ -3,7 +3,6 @@
 import rospy
 from std_msgs.msg import Float64, Int32
 import numbers
-
 from duckietown_msgs.msg import Twist2DStamped
 import os
 from duckietown.dtros import DTROS, NodeType
@@ -35,7 +34,6 @@ class ControlLaneNode(DTROS):
     def cbControl(self,msg):
         if msg.data == ControlType.Lane.value:
             self.enable = True
-        
         else:
             self.enable = False
 
@@ -64,7 +62,7 @@ class ControlLaneNode(DTROS):
         v = 0.2
 
         twist = Twist2DStamped(v=v, omega=a)
-        print(f'moving {v} {a} error {error}')
+        #print(f'moving {v} {a} error {error}')
         self.pub_cmd_vel.publish(twist)
 
 

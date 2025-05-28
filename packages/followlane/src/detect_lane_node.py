@@ -211,7 +211,6 @@ class DetectLaneNode(DTROS):
         #         msg_desired_center.data = None
         #         rospy.logerr("NO LINES FOUND FOR LINEDETECTION")
 
-            
         if desired_centers:
             msg_desired_center.data = desired_centers[0][0]
             self.pub_lane.publish(msg_desired_center)

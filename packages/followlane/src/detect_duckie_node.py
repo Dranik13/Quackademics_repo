@@ -7,8 +7,7 @@ import os
 from duckietown.dtros import DTROS, NodeType
 from sensor_msgs.msg import CompressedImage, Image
 from ultralytics import YOLO
-# import onnxruntime as ort
-from std_msgs.msg import Float64
+from std_msgs.msg import Float64, Bool
 from cv_bridge import CvBridge
 import yaml
 
@@ -18,7 +17,8 @@ class DetectDuckieNode(DTROS):
         # initialize the DTROS parent class
         super(DetectDuckieNode, self).__init__(node_name=node_name, node_type=NodeType.VISUALIZATION)
         self._model = YOLO("packages/followlane/assets/model.pt")
-        # self.model_ort = ort.InferenceSession("packages/followlane/assets/best.onnx")
+        self._model.to("cuda")
+
         self.load_conf('packages/followlane/config/detect_lane.yaml')
         self._vehicle_name = os.environ['VEHICLE_NAME']
         # Subscriber camera
@@ -29,7 +29,7 @@ class DetectDuckieNode(DTROS):
         self.pup_image = rospy.Publisher(self._yolo_topic,Image,queue_size = 1)
         # publish duckie
         self._duckie_topic = f"/{self._vehicle_name}/detect/duckie"
-        self.pup_duckie = rospy.Publisher(self._duckie_topic,Float64,queue_size = 1)
+        self.pup_duckie = rospy.Publisher(self._duckie_topic, Bool, queue_size = 1)
 
         self.counter = 0
         self.bridge = CvBridge()
@@ -45,73 +45,63 @@ class DetectDuckieNode(DTROS):
         np_arr = np.frombuffer(image_msg.data, np.uint8)
         cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
-        cv_image = cv2.resize(cv_image, (416,416))
+        results = self._model(cv_image, verbose=False)
 
-        results = self._model(cv_image) #, classes=)
-        # input_name = self.model_ort.get_inputs()[0].name
-        # outputs = self.model_ort.run(None, {input_name: cv_image})
-        # results = outputs[0]
 
         pts1 = np.float32([
             [self.conf['lane_image']['top_left_x'],     self.conf['lane_image']['top_left_y']],
             [self.conf['lane_image']['top_right_x'],    self.conf['lane_image']['top_right_y']],
             [self.conf['lane_image']['bottom_right_x'], self.conf['lane_image']['bottom_right_y']],
             [self.conf['lane_image']['bottom_left_x'],  self.conf['lane_image']['bottom_left_y']],])
-        '''
-        object_in_path = is_object_in_path(results, cv_image, pts1)
-        #object_in_path = False
-        if object_in_path:
-            msg_detected = 1
-            self.pup_duckie.publish(msg_detected)
-        else:
-            msg_detected = 0
-            self.pup_duckie.publish(msg_detected)
-        '''
-        image = draw_bounding_boxes(results,cv_image)
-
-        msg = self.bridge.cv2_to_imgmsg(image, "bgr8")
-        self.pup_image.publish(msg)
+        
+        self.is_object_in_path(results, cv_image, pts1)
+        
+        self.draw_bounding_boxes(results,cv_image)
 
     def load_conf(self,path):
 
         with open(path,'r') as f:
             text = f.read()
-
         self.conf = yaml.safe_load(text)
 
-def is_object_in_path(results, img, pts1):
-    object_in_path = False
+    def is_object_in_path(self,results, img, pts1):
+        object_in_path = False
 
-   # Erstelle eine Maske aus den Punkten, um den Bereich zu markieren
-    mask = np.zeros(img.shape[:2], dtype=np.uint8)
-    cv2.fillPoly(mask, [pts1.astype(np.int32)], 255)
+        # Erstelle eine Maske aus den Punkten, um den Bereich zu markieren
+        mask = np.zeros(img.shape[:2], dtype=np.uint8)
+        cv2.fillPoly(mask, [pts1.astype(np.int32)], 255)
 
-    # Überprüfung der Bounding Boxes
-    for result in results:
-        for box in result.boxes:
-            x1, y1 = int(box.xyxy[0][0]), int(box.xyxy[0][1])
-            x2, y2 = int(box.xyxy[0][2]), int(box.xyxy[0][3])
+        # Überprüfung der Bounding Boxes
+        for result in results:
+            for box in result.boxes:
+                x1, y1 = int(box.xyxy[0][0]), int(box.xyxy[0][1])
+                x2, y2 = int(box.xyxy[0][2]), int(box.xyxy[0][3])
 
-            # Mittelpunkt der Bounding Box berechnen
-            center_x = int((x1 + x2) / 2)
-            center_y = int((y1 + y2) / 2)
+                # Mittelpunkt der Bounding Box berechnen
+                center_x = int((x1 + x2) / 2)
+                center_y = int((y1 + y2) / 2)
 
-            # Prüfen, ob die Box im Fahrtbereich liegt
-            if mask[center_y, center_x] == 255:
-                object_in_path = True
-                break  # Kein weiteres Prüfen nötig, da ein Objekt erkannt wurde
+                # Prüfen, ob die Box im Fahrtbereich liegt
+                if mask[center_y, center_x] == 255:
+                    object_in_path = True
+                    break  # Kein weiteres Prüfen nötig, da ein Objekt erkannt wurde
+        if object_in_path:
+            msg_detected = True
+        else:
+            msg_detected = False
+        self.pup_duckie.publish(msg_detected)
 
-    return object_in_path
-
-def draw_bounding_boxes(results,img):
-    for result in results:
-        for box in result.boxes:
-            cv2.rectangle(img, (int(box.xyxy[0][0]), int(box.xyxy[0][1])),
-                          (int(box.xyxy[0][2]), int(box.xyxy[0][3])), (255, 0, 0), 5)
-            cv2.putText(img, f"{result.names[int(box.cls[0])]}",
-                        (int(box.xyxy[0][0]), int(box.xyxy[0][1]) - 10),
-                        cv2.FONT_HERSHEY_PLAIN, 1, (255, 0, 0), 5)
-    return img
+    def draw_bounding_boxes(self, results, img):
+        #print("results: ", len(results[0].boxes))
+        for result in results:
+            for box in result.boxes:
+                cv2.rectangle(img, (int(box.xyxy[0][0]), int(box.xyxy[0][1])),
+                            (int(box.xyxy[0][2]), int(box.xyxy[0][3])), (255, 0, 0), 5)
+                cv2.putText(img, f"{result.names[int(box.cls[0])]}",
+                            (int(box.xyxy[0][0]), int(box.xyxy[0][1]) - 10),
+                            cv2.FONT_HERSHEY_PLAIN, 1, (255, 0, 0), 5)
+        msg = self.bridge.cv2_to_imgmsg(img, "bgr8")
+        self.pup_image.publish(msg)
 
 
 if __name__ == '__main__':
