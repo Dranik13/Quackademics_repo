@@ -21,10 +21,10 @@ class ControlLaneNode(DTROS):
         self.sub_lane = rospy.Subscriber(f'/{self._vehicle_name}/detect/lane', Float64, self.cbFollowLane, queue_size = 1)
         self.sub_control = rospy.Subscriber(f"/{self._vehicle_name}/switch/control", Int32, self.cbControl , queue_size = 1)
         
-        self.Kp = 15     # P Anteil meist 2.0 - 4.0
-        self.Ki = 0.05   # I Anteil meist 0.0 - 0.5
+        self.Kp = 1.0     # P Anteil meist 2.0 - 4.0
+        self.Ki = 0.01    # I Anteil meist 0.0 - 0.5
         self.Kd = 0     # D Anteil meist 0.1 - 1.0
-        self.dt = 0.1    # Zeitintervall
+        self.dt = 0.1   # Zeitintervall
 
         self.integral = 0   # sum of error (integral)
         self.prev_error = 0 # Previous Error (on start == 0)
@@ -45,8 +45,8 @@ class ControlLaneNode(DTROS):
         self.followLane(center)
 
     def followLane(self, center):
-        # Image has 360 Pixel
-        error = -(center - 180) / 360
+        # Image has 640 Pixel
+        error = (320 - center) / 25
         P = error * self.Kp
 
         self.integral += error * self.dt
@@ -56,12 +56,12 @@ class ControlLaneNode(DTROS):
         D = self.Kd * derivative
         self.prev_error = error     # save last error
         
-        #print("I-Anteil", I)
-        #print("D-Anteil", D)
         a = P + I + D
-        v = 0.2
+        v = 0.3
 
         twist = Twist2DStamped(v=v, omega=a)
+
+        print("v: ", v, "omega: ", a)
         #print(f'moving {v} {a} error {error}')
         self.pub_cmd_vel.publish(twist)
 
