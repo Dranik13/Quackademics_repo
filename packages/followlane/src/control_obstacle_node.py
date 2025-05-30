@@ -22,7 +22,7 @@ class ControlObstacleNode(DTROS):
         self.enable = False
         self._vehicle_name = os.environ['VEHICLE_NAME']
         # Publish cmd
-        twist_topic = f"/{self._vehicle_name}/car_cmd_switch_node/cmd"
+        twist_topic = f"/{self._vehicle_name}/control/cmd"
         self.pub_cmd_vel = rospy.Publisher(twist_topic, Twist2DStamped, queue_size = 1)
         # Subscribe Bounding Boxes
         self._yolo_topic = f"/{self._vehicle_name}/detect/duckie/image"

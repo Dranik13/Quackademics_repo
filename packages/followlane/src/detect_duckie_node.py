@@ -49,10 +49,10 @@ class DetectDuckieNode(DTROS):
 
 
         pts1 = np.float32([
-            [self.conf['lane_image']['top_left_x'],     self.conf['lane_image']['top_left_y']],
-            [self.conf['lane_image']['top_right_x'],    self.conf['lane_image']['top_right_y']],
-            [self.conf['lane_image']['bottom_right_x'], self.conf['lane_image']['bottom_right_y']],
-            [self.conf['lane_image']['bottom_left_x'],  self.conf['lane_image']['bottom_left_y']],])
+            [self.conf['duckie_detect']['top_left_x'],     self.conf['duckie_detect']['top_left_y']],
+            [self.conf['duckie_detect']['top_right_x'],    self.conf['duckie_detect']['top_right_y']],
+            [self.conf['duckie_detect']['bottom_right_x'], self.conf['duckie_detect']['bottom_right_y']],
+            [self.conf['duckie_detect']['bottom_left_x'],  self.conf['duckie_detect']['bottom_left_y']],])
         
         self.is_object_in_path(results, cv_image, pts1)
         

@@ -15,7 +15,7 @@ class ControlLaneNode(DTROS):
         
         self.enable = True
         self._vehicle_name = os.environ['VEHICLE_NAME']
-        twist_topic = f"/{self._vehicle_name}/car_cmd_switch_node/cmd"
+        twist_topic = f"/{self._vehicle_name}/control/cmd"
         self.pub_cmd_vel = rospy.Publisher(twist_topic, Twist2DStamped, queue_size = 1)
 
         self.sub_lane = rospy.Subscriber(f'/{self._vehicle_name}/detect/lane', Float64, self.cbFollowLane, queue_size = 1)

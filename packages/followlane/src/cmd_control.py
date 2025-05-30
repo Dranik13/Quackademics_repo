@@ -11,6 +11,7 @@ from duckietown.dtros import DTROS, NodeType
 class SwitchControlNode(DTROS):
     def __init__(self,node_name):
         super(SwitchControlNode, self).__init__(node_name=node_name, node_type=NodeType.GENERIC)
+        self._vehicle_name = os.environ['VEHICLE_NAME']
         # Publish cmd
         twist_topic = f"/{self._vehicle_name}/car_cmd_switch_node/cmd"
         self.pub_cmd_vel = rospy.Publisher(twist_topic, Twist2DStamped, queue_size = 1)
@@ -19,24 +20,29 @@ class SwitchControlNode(DTROS):
         self.sub_lane = rospy.Subscriber(f"/{self._vehicle_name}/control/cmd", Twist2DStamped, self.cbCmdValue, queue_size = 1)
         self.sub_lane = rospy.Subscriber(f"/{self._vehicle_name}/front_center_tof_driver_node/range", Range, self.cbRange, queue_size = 1)
         self.range = Range()
+        self.cmd_value = Twist2DStamped()
 
     def cbCmdValue(self, msg):
         self.cmd_value =  msg
 
     def cbRange(self, msg):
         self.range = msg
+        #print("range: ", msg.range)
 
 
     def run(self):
         rate = rospy.Rate(10)
-       
+
         while not rospy.is_shutdown():
+            #print("drive")
+            #print("vel:", self.cmd_value)
             msg_cmd = Twist2DStamped()
             if self.range.range <= 0.2:
-                msg_cmd = Twist2DStamped(a=0, omega = 0)
+                msg_cmd = Twist2DStamped(v=0, omega = 0)
             else:
                 msg_cmd = self.cmd_value
             self.pub_cmd_vel.publish(msg_cmd)
+            
             
 
 if __name__ == '__main__':
