@@ -176,8 +176,8 @@ class CameraReaderNode(DTROS):
         x_alt = 0
         y_alt = 0
         for point in ['top_left','top_right','bottom_left','bottom_right','top_left']:
-            x = self.conf['lane_image'][f'{point}_x']
-            y = self.conf['lane_image'][f'{point}_y']
+            x = self.conf['duckie_detect'][f'{point}_x']
+            y = self.conf['duckie_detect'][f'{point}_y']
 
             if x_alt != 0 or y_alt != 0:
                 image = cv2.line(image,(x_alt,y_alt),(x,y),(255,255,255),2 )

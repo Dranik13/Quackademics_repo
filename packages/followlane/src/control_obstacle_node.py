@@ -22,7 +22,7 @@ class ControlObstacleNode(DTROS):
         self.enable = False
         self._vehicle_name = os.environ['VEHICLE_NAME']
         # Publish cmd
-        twist_topic = f"/{self._vehicle_name}/car_cmd_switch_node/cmd"
+        twist_topic = f"/{self._vehicle_name}/control/cmd"
         self.pub_cmd_vel = rospy.Publisher(twist_topic, Twist2DStamped, queue_size = 1)
         # Subscribe Bounding Boxes
         self._yolo_topic = f"/{self._vehicle_name}/detect/duckie/image"
@@ -34,7 +34,6 @@ class ControlObstacleNode(DTROS):
         self.pub_Obstacle_enabled = rospy.Publisher(f"/{self._vehicle_name}/obstacle/enabled", Bool, queue_size = 1)
         self._control_mode = ObstacleMode.Stop
         self.counter = 0
-        rospy.on_shutdown(self.fnShutDown)
 
     def cbControl(self,msg):
         if msg.data == ControlType.Obstacle.value and self._control_mode == ObstacleMode.Stop:
@@ -69,10 +68,6 @@ class ControlObstacleNode(DTROS):
             self._control_mode = ObstacleMode.Stop
             self.counter = 0
 
-    def fnShutDown(self):
-        rospy.loginfo("Shutting down. cmd_vel will be 0")
-        twist = Twist2DStamped(v=0.0, omega=0.0)
-        self.pub_cmd_vel.publish(twist) 
 
 if __name__ == '__main__':
     # create the node

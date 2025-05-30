@@ -15,7 +15,7 @@ class ControlLaneNode(DTROS):
         
         self.enable = True
         self._vehicle_name = os.environ['VEHICLE_NAME']
-        twist_topic = f"/{self._vehicle_name}/car_cmd_switch_node/cmd"
+        twist_topic = f"/{self._vehicle_name}/control/cmd"
         self.pub_cmd_vel = rospy.Publisher(twist_topic, Twist2DStamped, queue_size = 1)
 
         self.sub_lane = rospy.Subscriber(f'/{self._vehicle_name}/detect/lane', Float64, self.cbFollowLane, queue_size = 1)
@@ -28,8 +28,6 @@ class ControlLaneNode(DTROS):
 
         self.integral = 0   # sum of error (integral)
         self.prev_error = 0 # Previous Error (on start == 0)
-
-        rospy.on_shutdown(self.fnShutDown)
 
     def cbControl(self,msg):
         if msg.data == ControlType.Lane.value:
@@ -64,12 +62,6 @@ class ControlLaneNode(DTROS):
         #print("v: ", v, "omega: ", a)
         self.pub_cmd_vel.publish(twist)
 
-
-    def fnShutDown(self):
-        rospy.loginfo("Shutting down. cmd_vel will be 0")
-
-        twist = Twist2DStamped(v=0.0, omega=0.0)
-        self.pub_cmd_vel.publish(twist)
 
 if __name__ == '__main__':
     # create the node
