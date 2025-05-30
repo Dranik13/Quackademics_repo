@@ -21,6 +21,7 @@ class SwitchControlNode(DTROS):
         self.sub_lane = rospy.Subscriber(f"/{self._vehicle_name}/front_center_tof_driver_node/range", Range, self.cbRange, queue_size = 1)
         self.range = Range()
         self.cmd_value = Twist2DStamped()
+        rospy.on_shutdown(self.fnShutDown)
 
     def cbCmdValue(self, msg):
         self.cmd_value =  msg
@@ -42,7 +43,11 @@ class SwitchControlNode(DTROS):
             else:
                 msg_cmd = self.cmd_value
             self.pub_cmd_vel.publish(msg_cmd)
-            
+    
+    def fnShutDown(self):
+        rospy.loginfo("Shutting down. cmd_vel will be 0")
+        twist = Twist2DStamped(v=0.0, omega=0.0)
+        self.pub_cmd_vel.publish(twist) 
             
 
 if __name__ == '__main__':

@@ -29,8 +29,6 @@ class ControlLaneNode(DTROS):
         self.integral = 0   # sum of error (integral)
         self.prev_error = 0 # Previous Error (on start == 0)
 
-        rospy.on_shutdown(self.fnShutDown)
-
     def cbControl(self,msg):
         if msg.data == ControlType.Lane.value:
             self.enable = True
@@ -64,12 +62,6 @@ class ControlLaneNode(DTROS):
         #print("v: ", v, "omega: ", a)
         self.pub_cmd_vel.publish(twist)
 
-
-    def fnShutDown(self):
-        rospy.loginfo("Shutting down. cmd_vel will be 0")
-
-        twist = Twist2DStamped(v=0.0, omega=0.0)
-        self.pub_cmd_vel.publish(twist)
 
 if __name__ == '__main__':
     # create the node
