@@ -58,5 +58,5 @@ debugging_output:
   mask_yellow: false
 controller:
   max_speed: 0.3
-  min_speed_percent: 0.3
-  max_steering_angle: 5
+  min_speed_percent: 0.6
+  max_steering_angle: 6
