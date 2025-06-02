@@ -37,6 +37,8 @@ class DetectLaneNode(DTROS):
         self.counter = 0
         self.avoiding_obstacles = False
         self.drive_left = False
+        self.drive_left_timer = 0
+        self.drive_left_timer_run = False
 
     def transformToBirdsView(self, img):
         img = img.copy()
@@ -61,14 +63,23 @@ class DetectLaneNode(DTROS):
 
     def cbFindLane(self, image_msg):
 
-        if self.avoiding_obstacles:
-            self.drive_left = True
-
+        # 10 HZ -> 0.1 second
         if self.counter % 3 != 0:
             self.counter += 1
             return
         else:
             self.counter += 1
+        if self.avoiding_obstacles:
+            self.drive_left = True
+            self.drive_left_timer_run = True
+
+        if self.drive_left_timer_run == True:
+            self.drive_left_timer += 1
+            # print("timer: ", self.drive_left_timer / 10)
+                                        # 2 seconds         
+            if self.drive_left_timer >= 40:
+                self.drive_left_timer_run = False
+                self.drive_left_timer = 0
 
         np_arr = np.frombuffer(image_msg.data, np.uint8)
         cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
@@ -117,7 +128,7 @@ class DetectLaneNode(DTROS):
         height, width = mask_white.shape
 
         # search for right line if a middle line was found
-        if len(middle_pts) >= 2 and self.avoiding_obstacles == False:
+        if len(middle_pts) >= 2 and self.avoiding_obstacles == False and self.drive_left_timer_run == False:
             self.drive_left = False
             viewed_pt = 0
             sideline_pts = []
@@ -140,7 +151,7 @@ class DetectLaneNode(DTROS):
                     # search for sideline
                     if 0 <= new_x < width and 0 <= new_y < height and int(mask_white[int(new_y), int(new_x)]) != 0:
                         sideline_pts.append((int(new_x), int(new_y)))
-                        midpoint = (int((new_x + middle_pts[viewed_pt][0]) // 2), int((new_y + middle_pts[viewed_pt][1]) // 2))
+                        midpoint = (int((new_x + middle_pts[viewed_pt][0]) / 1.95), int((new_y + middle_pts[viewed_pt][1]) / 2))
                         desired_centers.append(midpoint)
 
                         if self.show_output_img:
@@ -181,17 +192,19 @@ class DetectLaneNode(DTROS):
 
         # set the absolute x-value of close points higher for faster reaction
         for i, pt in enumerate(desired_centers):
-            if pt[1] > 150:
-                new_x = np.sign(pt[0]) * (abs(pt[0]) + 50)
+            if pt[1] > 140:
+                diff = ((width/2) - pt[0]) * -2   # double the difference by adding it one additional time
+                new_x = pt[0] + diff
                 desired_centers[i] = (new_x, pt[1])
 
         msg_desired_center = Float64()
-        # print("anz. Punkte: ", len(desired_centers))
         if len(desired_centers) >= self.control_pt_nr:
             msg_desired_center.data = float(desired_centers[self.control_pt_nr-1][0])
+            # print("data: ", msg_desired_center.data)
             self.pub_lane.publish(msg_desired_center)
         elif desired_centers:
             msg_desired_center.data = float(desired_centers[len(desired_centers)-1][0])
+            # print("data: ", msg_desired_center.data)
             self.pub_lane.publish(msg_desired_center)
 
         if self.show_output_img:
