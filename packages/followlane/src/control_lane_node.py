@@ -21,8 +21,8 @@ class ControlLaneNode(DTROS):
         self.sub_lane = rospy.Subscriber(f'/{self._vehicle_name}/detect/lane', Float64, self.cbFollowLane, queue_size = 1)
         self.sub_control = rospy.Subscriber(f"/{self._vehicle_name}/switch/control", Int32, self.cbControl , queue_size = 1)
         
-        self.Kp = 1.0     # P Anteil meist 2.0 - 4.0
-        self.Ki = 0.01    # I Anteil meist 0.0 - 0.5
+        self.Kp = 1.3     # P Anteil meist 2.0 - 4.0
+        self.Ki = 0.04    # I Anteil meist 0.0 - 0.5
         self.Kd = 0     # D Anteil meist 0.1 - 1.0
         self.dt = 0.1   # Zeitintervall
 
@@ -59,7 +59,7 @@ class ControlLaneNode(DTROS):
 
         twist = Twist2DStamped(v=v, omega=a)
 
-        #print("v: ", v, "omega: ", a)
+        #print("CL: v: ", v, "omega: ", a)
         self.pub_cmd_vel.publish(twist)
 
 

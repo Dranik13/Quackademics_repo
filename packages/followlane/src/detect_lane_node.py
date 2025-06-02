@@ -55,7 +55,8 @@ class DetectLaneNode(DTROS):
                                             flags=cv2.INTER_CUBIC | cv2.WARP_INVERSE_MAP)
     
     def checkObstacleAvoidance(self, avoiding_obstacles_msg):
-        self.avoiding_obstacles = avoiding_obstacles_msg
+        #print("msg: ", avoiding_obstacles_msg.data)
+        self.avoiding_obstacles = avoiding_obstacles_msg.data
 
 
     def cbFindLane(self, image_msg):
@@ -156,8 +157,7 @@ class DetectLaneNode(DTROS):
                         if self.show_output_img:
                             cv2.circle(bv_img, desired_pt, 5, (255, 0, 0), -1)
 
-                viewed_pt+=1
-                    
+                viewed_pt+=1       
         # Search white line without middle line 
         else:
             white_contours, _ = cv2.findContours(mask_white, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -171,9 +171,9 @@ class DetectLaneNode(DTROS):
                     cy = int(M["m01"] / M["m00"])
 
                 if self.drive_left:
-                    desired_pt = (int(cx + 20)),(int(cy))
+                    desired_pt = (int(cx + 80)),(int(cy))
                 else:
-                    desired_pt = (int(cx - 20)),(int(cy))
+                    desired_pt = (int(cx - 50)),(int(cy))
 
                 desired_centers.append(desired_pt)
                 if self.show_output_img:
@@ -186,11 +186,10 @@ class DetectLaneNode(DTROS):
                 desired_centers[i] = (new_x, pt[1])
 
         msg_desired_center = Float64()
-
+        # print("anz. Punkte: ", len(desired_centers))
         if len(desired_centers) >= self.control_pt_nr:
             msg_desired_center.data = float(desired_centers[self.control_pt_nr-1][0])
             self.pub_lane.publish(msg_desired_center)
-
         elif desired_centers:
             msg_desired_center.data = float(desired_centers[len(desired_centers)-1][0])
             self.pub_lane.publish(msg_desired_center)
