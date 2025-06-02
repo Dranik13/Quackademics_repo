@@ -31,9 +31,9 @@ class SwitchControlNode(DTROS):
             msg_cmd = Twist2DStamped(v=0, omega = 0)
         else:
             msg_cmd = self.cmd_value
-        # v = self.cmd_value.v
-        # a = self.cmd_value.omega
-        # print("v: ", v, "omega: ", a)
+        v = self.cmd_value.v
+        a = self.cmd_value.omega
+        print("v: ", v, "omega: ", a)
         self.pub_cmd_vel.publish(msg_cmd)
 
     def cbRange(self, msg):
