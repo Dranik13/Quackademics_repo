@@ -26,6 +26,16 @@ class SwitchControlNode(DTROS):
     def cbCmdValue(self, msg):
         self.cmd_value =  msg
 
+        msg_cmd = Twist2DStamped()
+        if self.range.range <= 0.2:
+            msg_cmd = Twist2DStamped(v=0, omega = 0)
+        else:
+            msg_cmd = self.cmd_value
+        # v = self.cmd_value.v
+        # a = self.cmd_value.omega
+        # print("v: ", v, "omega: ", a)
+        self.pub_cmd_vel.publish(msg_cmd)
+
     def cbRange(self, msg):
         self.range = msg
         #print("range: ", msg.range)
@@ -34,15 +44,18 @@ class SwitchControlNode(DTROS):
     def run(self):
         rate = rospy.Rate(10)
 
-        while not rospy.is_shutdown():
+        #while not rospy.is_shutdown():
             #print("drive")
             #print("vel:", self.cmd_value)
-            msg_cmd = Twist2DStamped()
-            if self.range.range <= 0.2:
-                msg_cmd = Twist2DStamped(v=0, omega = 0)
-            else:
-                msg_cmd = self.cmd_value
-            self.pub_cmd_vel.publish(msg_cmd)
+            # msg_cmd = Twist2DStamped()
+            # if self.range.range <= 0.2:
+            #     msg_cmd = Twist2DStamped(v=0, omega = 0)
+            # else:
+            #     msg_cmd = self.cmd_value
+            # v = self.cmd_value.v
+            # a = self.cmd_value.omega
+            # print("v: ", v, "omega: ", a)
+            # self.pub_cmd_vel.publish(msg_cmd)
     
     def fnShutDown(self):
         rospy.loginfo("Shutting down. cmd_vel will be 0")
@@ -53,6 +66,6 @@ class SwitchControlNode(DTROS):
 if __name__ == '__main__':
     # create the node
     node = SwitchControlNode(node_name='cmd_control_node')
-    node.run()
+    #node.run()
     # keep the process from terminating
     rospy.spin()

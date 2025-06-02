@@ -38,20 +38,16 @@ class ControlObstacleNode(DTROS):
     def cbControl(self,msg):
         if msg.data == ControlType.Obstacle.value and self._control_mode == ObstacleMode.Stop:
             self.enable = True
-        elif msg.data != ControlType.Obstacle.value and self._control_mode == ObstacleMode.Stop:
-            self.enable = False
         msg = self.enable
         self.pub_Obstacle_enabled.publish(msg)
 
     def cbAvoideObstacle(self, msg):
         
         if not self.enable:
-            twist = Twist2DStamped(v=0, omega=0)
-            self.pub_cmd_vel.publish(twist)
             return
         
         if self._control_mode == ObstacleMode.Spin:
-            twist = Twist2DStamped(v=0, omega=1)
+            twist = Twist2DStamped(v=0, omega=3)
             self.pub_cmd_vel.publish(twist)
         
         if self._control_mode == ObstacleMode.Move:
@@ -64,8 +60,11 @@ class ControlObstacleNode(DTROS):
         else:
             self._control_mode = ObstacleMode.Move
         
-        if self.counter == 5:
+        if self.counter == 2:
             self._control_mode = ObstacleMode.Stop
+            self.enable = False
+            msg = self.enable
+            self.pub_Obstacle_enabled.publish(msg)
             self.counter = 0
 
 
