@@ -60,7 +60,9 @@ class DetectLaneNode(DTROS):
 
 
     def cbFindLane(self, image_msg):
-
+        #################### Für Config-file #################################
+        max_diff = 40
+        ######################################################################
         if self.avoiding_obstacles:
             self.drive_left = True
 
@@ -140,7 +142,7 @@ class DetectLaneNode(DTROS):
                     # search for sideline
                     if 0 <= new_x < width and 0 <= new_y < height and int(mask_white[int(new_y), int(new_x)]) != 0:
                         sideline_pts.append((int(new_x), int(new_y)))
-                        midpoint = (int((new_x + middle_pts[viewed_pt][0]) // 2), int((new_y + middle_pts[viewed_pt][1]) // 2))
+                        midpoint = (int((new_x + middle_pts[viewed_pt][0]) / 1.95), int((new_y + middle_pts[viewed_pt][1]) / 1.95))
                         desired_centers.append(midpoint)
 
                         if self.show_output_img:
@@ -181,17 +183,21 @@ class DetectLaneNode(DTROS):
 
         # set the absolute x-value of close points higher for faster reaction
         for i, pt in enumerate(desired_centers):
-            if pt[1] > 150:
-                new_x = np.sign(pt[0]) * (abs(pt[0]) + 50)
+            if pt[1] > 160:
+                diff = ((width/2) - pt[0]) * -1   # double the difference by adding it one additional time
+                new_x = pt[0] + diff
                 desired_centers[i] = (new_x, pt[1])
 
         msg_desired_center = Float64()
         # print("anz. Punkte: ", len(desired_centers))
         if len(desired_centers) >= self.control_pt_nr:
+            # if desired_centers[self.control_pt_nr-1][1] <= 
             msg_desired_center.data = float(desired_centers[self.control_pt_nr-1][0])
+            # if msg_desired_center.data >= max_diff: msg_desired_center.data = max_diff
             self.pub_lane.publish(msg_desired_center)
         elif desired_centers:
             msg_desired_center.data = float(desired_centers[len(desired_centers)-1][0])
+            # if msg_desired_center.data >= max_diff: msg_desired_center.data = max_diff
             self.pub_lane.publish(msg_desired_center)
 
         if self.show_output_img:
