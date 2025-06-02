@@ -45,14 +45,10 @@ class SwitchControlNode(DTROS):
         rate = rospy.Rate(10)
        
         while not rospy.is_shutdown():
-            #if self.counter == 10000:
-            #    print("control_mode: ", self._control_mode)
-            #    self.counter = 0
-            #else:
-            #    self.counter +=1
             msg_control = Int32()
             msg_control.data = self._control_mode.value
             self.pub_control.publish(msg_control)
+            rate.sleep()
             
 
 if __name__ == '__main__':
