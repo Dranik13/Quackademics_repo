@@ -7,9 +7,10 @@ import os
 from duckietown.dtros import DTROS, NodeType
 from sensor_msgs.msg import CompressedImage, Image
 from ultralytics import YOLO
-from std_msgs.msg import Float64, Bool
+from std_msgs.msg import Bool
 from cv_bridge import CvBridge
 import yaml
+from threading import Lock
 
 
 class DetectDuckieNode(DTROS):
@@ -31,7 +32,16 @@ class DetectDuckieNode(DTROS):
         self._duckie_topic = f"/{self._vehicle_name}/detect/duckie"
         self.pup_duckie = rospy.Publisher(self._duckie_topic, Bool, queue_size = 1)
 
+        self.pts1 = np.float32([
+            [self.conf['duckie_detect']['top_left_x'],     self.conf['duckie_detect']['top_left_y']],
+            [self.conf['duckie_detect']['top_right_x'],    self.conf['duckie_detect']['top_right_y']],
+            [self.conf['duckie_detect']['bottom_right_x'], self.conf['duckie_detect']['bottom_right_y']],
+            [self.conf['duckie_detect']['bottom_left_x'],  self.conf['duckie_detect']['bottom_left_y']],])
+
         self.counter = 0
+
+        self.image_lock = Lock()
+        self.latest_image = None
         self.bridge = CvBridge()
 
 
@@ -44,19 +54,12 @@ class DetectDuckieNode(DTROS):
 
         np_arr = np.frombuffer(image_msg.data, np.uint8)
         cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-
-        results = self._model(cv_image, verbose=False)
-
-
-        pts1 = np.float32([
-            [self.conf['duckie_detect']['top_left_x'],     self.conf['duckie_detect']['top_left_y']],
-            [self.conf['duckie_detect']['top_right_x'],    self.conf['duckie_detect']['top_right_y']],
-            [self.conf['duckie_detect']['bottom_right_x'], self.conf['duckie_detect']['bottom_right_y']],
-            [self.conf['duckie_detect']['bottom_left_x'],  self.conf['duckie_detect']['bottom_left_y']],])
+        with self.image_lock:
+            self.latest_image = cv_image
+        # results = self._model(cv_image, verbose=False)
+        # self.is_object_in_path(results, cv_image, self.pts1)
         
-        self.is_object_in_path(results, cv_image, pts1)
-        
-        self.draw_bounding_boxes(results,cv_image)
+        # self.draw_bounding_boxes(results,cv_image)
 
     def load_conf(self,path):
 
@@ -64,12 +67,12 @@ class DetectDuckieNode(DTROS):
             text = f.read()
         self.conf = yaml.safe_load(text)
 
-    def is_object_in_path(self,results, img, pts1):
+    def is_object_in_path(self,results, img):
         object_in_path = False
 
         # Erstelle eine Maske aus den Punkten, um den Bereich zu markieren
         mask = np.zeros(img.shape[:2], dtype=np.uint8)
-        cv2.fillPoly(mask, [pts1.astype(np.int32)], 255)
+        cv2.fillPoly(mask, [self.pts1.astype(np.int32)], 255)
 
         # Überprüfung der Bounding Boxes
         for result in results:
@@ -103,7 +106,22 @@ class DetectDuckieNode(DTROS):
         msg = self.bridge.cv2_to_imgmsg(img, "bgr8")
         self.pup_image.publish(msg)
 
+    def run(self):
+        rate = rospy.Rate(30)   # 30 Hz
+
+        while not rospy.is_shutdown():
+            image = None
+            with self.image_lock:
+                if self.latest_image is not None:
+                    image = self.latest_image.copy()
+
+            if image is not None:
+                results = self._model(image, verbose=False)
+                self.is_object_in_path(results, image)
+                self.draw_bounding_boxes(results, image)
+            rate.sleep()
 
 if __name__ == '__main__':
     node = DetectDuckieNode(node_name='detect_duckie_node')
+    node.run()
     rospy.spin()
