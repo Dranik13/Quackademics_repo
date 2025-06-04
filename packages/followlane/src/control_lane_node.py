@@ -23,7 +23,7 @@ class ControlLaneNode(DTROS):
         
         self.Kp = 1.1     # P Anteil meist 2.0 - 4.0
         self.Ki = 0.0    # I Anteil meist 0.0 - 0.5
-        self.Kd = 0.2     # D Anteil meist 0.1 - 1.0
+        self.Kd = 0.0     # D Anteil meist 0.1 - 1.0
         self.dt = 0.1   # Zeitintervall
 
         self.integral = 0   # sum of error (integral)

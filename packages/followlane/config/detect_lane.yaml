@@ -50,6 +50,11 @@ line_detection_params:
   num_middle_pts: 7
   # Orientierungspunkt der an die Regelung gesendet wird. Gezählt vom am Fz. nächsten 
   control_pt_nr: 3
+search_for_parking_lot:
+  look_for_parkinglot: false
+  search_range: 50
+  min_nr_line_segments: 4
+  max_y_diff: 40
 debugging_output:
   line_coordinates: false
   input_image: false

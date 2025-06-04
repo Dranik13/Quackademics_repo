@@ -53,10 +53,10 @@ class SwitchControlNode(DTROS):
 
         while not rospy.is_shutdown():
             
-            # if self.range.range <= 0.2:
-            #     msg_cmd = Twist2DStamped(v=0, omega = 0)
-            if False:
-                pass
+            if self.range.range <= 0.2:
+                msg_cmd = Twist2DStamped(v=0, omega = 0)
+            # if False:
+            #     pass
             else:
                 msg_cmd = self.cmd_value
                 if msg_cmd.omega >= self.theta_max:
