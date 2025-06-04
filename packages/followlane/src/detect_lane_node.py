@@ -151,7 +151,7 @@ class DetectLaneNode(DTROS):
                     # search for sideline
                     if 0 <= new_x < width and 0 <= new_y < height and int(mask_white[int(new_y), int(new_x)]) != 0:
                         sideline_pts.append((int(new_x), int(new_y)))
-                        midpoint = (int((new_x + middle_pts[viewed_pt][0]) / 1.95), int((new_y + middle_pts[viewed_pt][1]) / 2))
+                        midpoint = (int((new_x + middle_pts[viewed_pt][0]) / 2.0), int((new_y + middle_pts[viewed_pt][1]) / 2.0))
                         desired_centers.append(midpoint)
 
                         if self.show_output_img:
@@ -184,7 +184,7 @@ class DetectLaneNode(DTROS):
                 if self.drive_left:
                     desired_pt = (int(cx + 80)),(int(cy))
                 else:
-                    desired_pt = (int(cx - 50)),(int(cy))
+                    desired_pt = (int(cx - 80)),(int(cy))
 
                 desired_centers.append(desired_pt)
                 if self.show_output_img:
@@ -192,19 +192,23 @@ class DetectLaneNode(DTROS):
 
         # set the absolute x-value of close points higher for faster reaction
         for i, pt in enumerate(desired_centers):
-            if pt[1] > 140:
+            if pt[1] > 150:
                 diff = ((width/2) - pt[0]) * -2   # double the difference by adding it one additional time
                 new_x = pt[0] + diff
                 desired_centers[i] = (new_x, pt[1])
 
         msg_desired_center = Float64()
-        if len(desired_centers) >= self.control_pt_nr:
-            msg_desired_center.data = float(desired_centers[self.control_pt_nr-1][0])
-            # print("data: ", msg_desired_center.data)
+
+        if desired_centers[len(desired_centers)-1][1] >= 130 and len(desired_centers) >= 2:
+            msg_desired_center.data = float(desired_centers[len(desired_centers)-1][0])
             self.pub_lane.publish(msg_desired_center)
+
+        elif len(desired_centers) >= self.control_pt_nr:
+            msg_desired_center.data = float(desired_centers[self.control_pt_nr-1][0])
+            self.pub_lane.publish(msg_desired_center)
+
         elif desired_centers:
             msg_desired_center.data = float(desired_centers[len(desired_centers)-1][0])
-            # print("data: ", msg_desired_center.data)
             self.pub_lane.publish(msg_desired_center)
 
         if self.show_output_img:

@@ -21,13 +21,15 @@ class ControlLaneNode(DTROS):
         self.sub_lane = rospy.Subscriber(f'/{self._vehicle_name}/detect/lane', Float64, self.cbFollowLane, queue_size = 1)
         self.sub_control = rospy.Subscriber(f"/{self._vehicle_name}/switch/control", Int32, self.cbControl , queue_size = 1)
         
-        self.Kp = 1.3     # P Anteil meist 2.0 - 4.0
-        self.Ki = 0.04    # I Anteil meist 0.0 - 0.5
-        self.Kd = 0     # D Anteil meist 0.1 - 1.0
+        self.Kp = 1.1     # P Anteil meist 2.0 - 4.0
+        self.Ki = 0.0    # I Anteil meist 0.0 - 0.5
+        self.Kd = 0.2     # D Anteil meist 0.1 - 1.0
         self.dt = 0.1   # Zeitintervall
 
         self.integral = 0   # sum of error (integral)
         self.prev_error = 0 # Previous Error (on start == 0)
+
+        self.twist = Twist2DStamped(v=0.3, omega=0)
 
     def cbControl(self,msg):
         if msg.data == ControlType.Lane.value:
@@ -55,16 +57,24 @@ class ControlLaneNode(DTROS):
         self.prev_error = error     # save last error
         
         a = P + I + D
-        v = 0.3
+        v = 0.5
+        self.twist = Twist2DStamped(v=v, omega=a)
+        #twist = Twist2DStamped(v=v, omega=a)
 
-        twist = Twist2DStamped(v=v, omega=a)
+        # print("CL: v: ", v, "omega: ", a)
+        #self.pub_cmd_vel.publish(twist)
+    
+    def run(self):
+        rate = rospy.Rate(10)   # 10 Hz
 
-        #print("CL: v: ", v, "omega: ", a)
-        self.pub_cmd_vel.publish(twist)
+        while not rospy.is_shutdown():
+            self.pub_cmd_vel.publish(self.twist)
+            rate.sleep()
 
 
 if __name__ == '__main__':
     # create the node
     node = ControlLaneNode(node_name='control_lane_node')
+    node.run()
     # keep the process from terminating
     rospy.spin()
