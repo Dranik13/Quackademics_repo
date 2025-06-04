@@ -40,6 +40,7 @@ class DetectDuckieNode(DTROS):
 
         self.counter = 0
 
+        self.last_frame = False
         self.image_lock = Lock()
         self.latest_image = None
         self.bridge = CvBridge()
@@ -89,9 +90,13 @@ class DetectDuckieNode(DTROS):
                     object_in_path = True
                     break  # Kein weiteres Prüfen nötig, da ein Objekt erkannt wurde
         if object_in_path:
-            msg_detected = True
+            if self.last_frame:
+                msg_detected = True
+            else:
+                msg_detected = False
         else:
             msg_detected = False
+        self.last_frame = object_in_path
         self.pup_duckie.publish(msg_detected)
 
     def draw_bounding_boxes(self, results, img):

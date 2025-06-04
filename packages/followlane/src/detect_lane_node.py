@@ -106,32 +106,30 @@ class DetectLaneNode(DTROS):
         mask_white = cv2.morphologyEx(mask_white, cv2.MORPH_CLOSE, kernel)
         mask_yellow = cv2.morphologyEx(mask_yellow, cv2.MORPH_CLOSE, kernel)
 
-        contours, _ = cv2.findContours(mask_yellow, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        yellow_contours, _ = cv2.findContours(mask_yellow, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        white_contours = []
 
         # calculate middle_pts of line segments
         middle_pts = []
         mask_x_center = mask_yellow.shape[1] // 2
-        for contour in contours:
-            M = cv2.moments(contour)
-            if M["m00"] != 0:  # Make sure the area isn't zero
-                cx = int(M["m10"] / M["m00"])
-                cy = int(M["m01"] / M["m00"])
-                # accept middlepoint of line segment if it is within self.middle_line_look_width 
-                if cx >= mask_x_center - self.middle_line_look_width/2 and cx <= mask_x_center + self.middle_line_look_width:
-                    middle_pts.append((cx,cy))
-                    cv2.circle(bv_img, (cx, cy), 5, (0, 0, 255), -1)
-                    
-                    if len(middle_pts) == self.num_middle_pts:
-                        break
+        for contour in yellow_contours:
+            cx, cy = calcMiddlePtOfContours(contour)
+            # accept middlepoint of line segment if it is within self.middle_line_look_width 
+            if cx >= mask_x_center - self.middle_line_look_width/2 and cx <= mask_x_center + self.middle_line_look_width:
+                middle_pts.append((cx,cy))
+                cv2.circle(bv_img, (cx, cy), 5, (0, 0, 255), -1)
+                
+                if len(middle_pts) == self.num_middle_pts:
+                    break
         
         desired_centers = []
         height, width = mask_white.shape
+        sideline_pts = []
 
         # search for right line if a middle line was found
         if len(middle_pts) >= 2 and self.avoiding_obstacles == False and self.drive_left_timer_run == False:
             self.drive_left = False
             viewed_pt = 0
-            sideline_pts = []
 
             while viewed_pt <= len(middle_pts) -2:
                 #                  first contur, first pt, x/y
@@ -151,7 +149,7 @@ class DetectLaneNode(DTROS):
                     # search for sideline
                     if 0 <= new_x < width and 0 <= new_y < height and int(mask_white[int(new_y), int(new_x)]) != 0:
                         sideline_pts.append((int(new_x), int(new_y)))
-                        midpoint = (int((new_x + middle_pts[viewed_pt][0]) / 1.95), int((new_y + middle_pts[viewed_pt][1]) / 2))
+                        midpoint = (int((new_x + middle_pts[viewed_pt][0]) / 2.0), int((new_y + middle_pts[viewed_pt][1]) / 2.0))
                         desired_centers.append(midpoint)
 
                         if self.show_output_img:
@@ -168,23 +166,19 @@ class DetectLaneNode(DTROS):
                         if self.show_output_img:
                             cv2.circle(bv_img, desired_pt, 5, (255, 0, 0), -1)
 
-                viewed_pt+=1       
-        # Search white line without middle line 
+                viewed_pt+=1
+        # Search white line without middle line
         else:
             white_contours, _ = cv2.findContours(mask_white, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             if white_contours:
                 # find lowest contur (highest y-Wert)
                 lowest_contour = max(white_contours, key=lambda c: cv2.boundingRect(c)[1] + cv2.boundingRect(c)[3])
-                # calc middlepoint
-                M = cv2.moments(lowest_contour)
-                if M["m00"] != 0:
-                    cx = int(M["m10"] / M["m00"])
-                    cy = int(M["m01"] / M["m00"])
+                cx, cy = calcMiddlePtOfContours(lowest_contour)
 
                 if self.drive_left:
                     desired_pt = (int(cx + 80)),(int(cy))
                 else:
-                    desired_pt = (int(cx - 50)),(int(cy))
+                    desired_pt = (int(cx - 80)),(int(cy))
 
                 desired_centers.append(desired_pt)
                 if self.show_output_img:
@@ -192,20 +186,57 @@ class DetectLaneNode(DTROS):
 
         # set the absolute x-value of close points higher for faster reaction
         for i, pt in enumerate(desired_centers):
-            if pt[1] > 140:
+            if pt[1] > 150:
                 diff = ((width/2) - pt[0]) * -2   # double the difference by adding it one additional time
                 new_x = pt[0] + diff
                 desired_centers[i] = (new_x, pt[1])
 
         msg_desired_center = Float64()
-        if len(desired_centers) >= self.control_pt_nr:
-            msg_desired_center.data = float(desired_centers[self.control_pt_nr-1][0])
-            # print("data: ", msg_desired_center.data)
+
+        if desired_centers[len(desired_centers)-1][1] >= 130 and len(desired_centers) >= 2:
+            msg_desired_center.data = float(desired_centers[len(desired_centers)-1][0])
             self.pub_lane.publish(msg_desired_center)
+
+        elif len(desired_centers) >= self.control_pt_nr:
+            msg_desired_center.data = float(desired_centers[self.control_pt_nr-1][0])
+            self.pub_lane.publish(msg_desired_center)
+
         elif desired_centers:
             msg_desired_center.data = float(desired_centers[len(desired_centers)-1][0])
-            # print("data: ", msg_desired_center.data)
             self.pub_lane.publish(msg_desired_center)
+
+        # detect parking lot
+        potential_parking_lot_marks = []
+        parking_lot_marks = []
+        if self.look_for_parkinglot and sideline_pts:
+            if not white_contours and len(white_contours) <= 0:
+                white_contours, _ = cv2.findContours(mask_white, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                
+            x_search_coordinate = sideline_pts[len(sideline_pts)//2][0]
+            for contour in white_contours:
+                for pt in contour:
+                    x = pt[0][0]
+                    if x_search_coordinate - self.search_range <= x <= x_search_coordinate + self.search_range:
+                        potential_parking_lot_marks.append(contour)
+                        break
+            if len(potential_parking_lot_marks) >= self.min_nr_line_segments:
+                # y-coordinates of marks have to be close to each other
+                centers = []
+                for contour in potential_parking_lot_marks:
+                    cx, cy = calcMiddlePtOfContours(contour)
+                    centers.append((cx, cy))
+
+                # sort list if it isn't sorted already
+                #centers_sorted = sorted(centers, key=lambda pt: pt[1])
+
+                for i in range(1, len(centers)):
+                    y_prev = centers[i-1][1]
+                    y_curr = centers[i][1]
+                    if abs(y_curr - y_prev) <= self.max_y_diff:
+                        parking_lot_marks.append(potential_parking_lot_marks[i])
+
+            if self.show_output_img:
+                cv2.drawContours(bv_img, parking_lot_marks, -1, (0, 255, 0), 2)
 
         if self.show_output_img:
             cv2.imshow("line detection", bv_img)
@@ -251,6 +282,11 @@ class DetectLaneNode(DTROS):
         self.num_middle_pts = self.conf['line_detection_params']['num_middle_pts']
         self.control_pt_nr = self.conf['line_detection_params']['control_pt_nr']
 
+        self.look_for_parkinglot = self.conf['search_for_parking_lot']['look_for_parkinglot']
+        self.search_range = self.conf['search_for_parking_lot']['search_range']
+        self.min_nr_line_segments = self.conf['search_for_parking_lot']['min_nr_line_segments']
+        self.max_y_diff = self.conf['search_for_parking_lot']['max_y_diff']
+
         self.show_line_coordinates = self.conf['debugging_output']['line_coordinates']
         self.show_input_img = self.conf['debugging_output']['input_image']
         self.show_output_img = self.conf['debugging_output']['output_image']
@@ -263,6 +299,15 @@ def calcOrientation(pt1, pt2):
     dy = pt2[1] - pt1[1]
     orientation = np.arctan2(dy, dx)
     return orientation
+
+def calcMiddlePtOfContours(contour):
+    M = cv2.moments(contour)
+    if M["m00"] != 0:
+        cx = int(M["m10"] / M["m00"])
+        cy = int(M["m01"] / M["m00"])
+        return cx, cy
+
+    return None, None
 
 if __name__ == '__main__':
 

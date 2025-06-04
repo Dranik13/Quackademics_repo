@@ -71,7 +71,6 @@ class ControlObstacleNode(DTROS):
                 self._control_mode = ObstacleMode.Stop
                 self.enable = False
                 self.pub_Obstacle_enabled.publish(Bool(data=False))
-                print("stop")
                 self._counter = 0
             
             rate.sleep()
