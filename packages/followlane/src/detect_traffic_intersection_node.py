@@ -32,19 +32,20 @@ class CrossingIntersectionNode(DTROS):
         np_arr = np.frombuffer(image_msg.data, np.uint8)
         cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
-        flags, debug_img = self.compute_possible_directions(cv_image)
+        flags, debug_img = self.compute_possible_directions(cv_image, distance=0.8)
 
-        # Bit-Kodierung
-        STOP = 1 << 0
-        RIGHT = 1 << 1
-        LEFT = 1 << 2
-        STRAIGHT = 1 << 3
+        # Bitkombination der Richtungsflags um mehrere Richtungen gleichzeitig zu repräsentieren
+        DIRECTIONS = {
+            "Stop":     1 << 0,  # 1
+            "Right":    1 << 1,  # 2
+            "Left":     1 << 2,  # 4
+            "Straight": 1 << 3,  # 8
+            }
 
-        flags_bin = 0
-        if flags["Stop"]:     flags_bin |= STOP
-        if flags["Right"]:    flags_bin |= RIGHT
-        if flags["Left"]:     flags_bin |= LEFT
-        if flags["Straight"]: flags_bin |= STRAIGHT
+        # Flags in eine Bitkombination umwandeln
+        flags_bin = sum(
+            bit for key, bit in DIRECTIONS.items() if flags.get(key, False)
+        )
 
         self.pub_crossing.publish(flags_bin)
 
@@ -53,7 +54,7 @@ class CrossingIntersectionNode(DTROS):
         self.pub_debug_img.publish(debug_msg)
 
      # Methode zur Bestimmung der Kreuzung
-    def compute_possible_directions(image):
+    def compute_possible_directions(image, distance = 0.8):
         flags = {
             "Stop": False,
             "Right": False,
@@ -136,7 +137,7 @@ class CrossingIntersectionNode(DTROS):
 
         # Analyse Flags
         # Hier wird angenommen, dass die Kreuzung erreicht ist, wenn ein Punkt der Kontur im unteren 20% des Bildes liegt
-        y_schwelle = int(height * 0.8)
+        y_schwelle = int(height * distance)
         for c in contours:
             if cv2.contourArea(c) > 500:
                 for point in c:
@@ -161,5 +162,25 @@ if __name__ == '__main__':
     rospy.init_node('crossing_intersection_node', anonymous=False)
     node = CrossingIntersectionNode(node_name='crossing_intersection_node')
     rospy.spin()
+
+
+# Methode zum Wechsel in Kreuzungsmodus
+
+#from std_msgs.msg import Int32
+
+#def cbCrossingFlags(self, msg: Int32):
+#    flags_bin = msg.data
+    
+    # Prüfe ob Stop-Bit gesetzt ist
+#    STOP_BIT = 1 << 0  # 1
+    
+#    if flags_bin & STOP_BIT:
+        # Stop-Bit ist True (gesetzt)
+#        print("Stop erkannt! Reagiere darauf...")
+#        self._control_mode = ControlType.Obstacle
+#    else:
+        # Stop nicht gesetzt
+#        self._control_mode = ControlType.Lane
+
 
    
