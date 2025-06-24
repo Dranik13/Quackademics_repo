@@ -4,15 +4,22 @@ import rospy
 import cv2
 import numpy as np
 import os
+import random
 from duckietown.dtros import DTROS, NodeType
 from sensor_msgs.msg import CompressedImage, Image
-from std_msgs.msg import Float64
-from cv_bridge import CvBridge
 from std_msgs.msg import Int32
+from cv_bridge import CvBridge
 
 
 class CrossingIntersectionNode(DTROS):
     
+    DIRECTIONS = {
+        "Stop":     1 << 0,  # 1
+        "Right":    1 << 1,  # 2
+        "Left":     1 << 2,  # 4
+        "Straight": 1 << 3,  # 8
+    }
+
     def __init__(self, node_name):
         super(CrossingIntersectionNode, self).__init__(node_name=node_name, node_type=NodeType.VISUALIZATION)
 
@@ -34,27 +41,57 @@ class CrossingIntersectionNode(DTROS):
 
         flags, debug_img = self.compute_possible_directions(cv_image, distance=0.8)
 
-        # Bitkombination der Richtungsflags um mehrere Richtungen gleichzeitig zu repräsentieren
-        DIRECTIONS = {
-            "Stop":     1 << 0,  # 1
-            "Right":    1 << 1,  # 2
-            "Left":     1 << 2,  # 4
-            "Straight": 1 << 3,  # 8
-            }
-
-        # Flags in eine Bitkombination umwandeln
+        # Bitmaske aus dem erkannten Zustand erstellen
         flags_bin = sum(
-            bit for key, bit in DIRECTIONS.items() if flags.get(key, False)
+            bit for key, bit in self.DIRECTIONS.items() if flags.get(key, False)
         )
 
-        self.pub_crossing.publish(flags_bin)
+        # Prüfen, ob Stop aktiv ist – nur dann publishen
+        if not (flags_bin & self.DIRECTIONS["Stop"]):
+            return  # Keine Kreuzung erkannt → Zufällige Richtung nicht wählen
+        # Wenn Stop erkannt ist, wähle eine zufällige Richtung
 
-        # Debug-Bild veröffentlichen
+        # Stop erkannt → zufällige Richtung wählen
+        selected_flags = self.choose_random_direction(flags_bin)
+
+        # Neue Bitmaske erstellen
+        selected_flags_bin = sum(
+            bit for key, bit in self.DIRECTIONS.items() if selected_flags.get(key, False)
+        )
+
+        self.pub_crossing.publish(selected_flags_bin)
+
+        # Debug-Bild immer anzeigen (optional)
         debug_msg = self.bridge.cv2_to_imgmsg(debug_img, encoding="bgr8")
         self.pub_debug_img.publish(debug_msg)
 
-     # Methode zur Bestimmung der Kreuzung
-    def compute_possible_directions(image, distance = 0.8):
+
+    def choose_random_direction(self, state):
+        stop_active = bool(state & self.DIRECTIONS["Stop"])
+
+        possible_directions = [
+            direction for direction in ["Right", "Left", "Straight"]
+            if state & self.DIRECTIONS[direction]
+        ]
+
+        if not possible_directions:
+            return {
+                "Stop": stop_active,
+                "Right": False,
+                "Left": False,
+                "Straight": False
+            }
+
+        chosen = random.choice(possible_directions)
+
+        return {
+            "Stop": stop_active,
+            "Right": chosen == "Right",
+            "Left": chosen == "Left",
+            "Straight": chosen == "Straight"
+        }
+
+    def compute_possible_directions(self, image, distance=0.8):
         flags = {
             "Stop": False,
             "Right": False,
@@ -78,22 +115,16 @@ class CrossingIntersectionNode(DTROS):
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
 
-        # Definition der Region of Interest (ROI)
-        # Hier wird angenommen, dass die roten Objekte nicht im oberen Drittel des Bildes liegen
         height, width = mask.shape[:2]
         roi_start = height // 3
         mask[:roi_start, :] = 0
 
-        # Konturen extrahieren 
-        # Filter auf Konturen mit einer Mindestfläche von 100 Pixeln anwenden und nur die 4 größten Konturen behalten
         contours_all, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         filtered = [c for c in contours_all if cv2.contourArea(c) >= 100]
         contours = sorted(filtered, key=cv2.contourArea, reverse=True)[:4]
 
         image_copy = image.copy()
         center_img = np.array([width // 2, height // 2])
-
-        # Vektoren und Winkel berechnen
         winkel_liste = []
 
         for i, kontur in enumerate(contours):
@@ -112,7 +143,6 @@ class CrossingIntersectionNode(DTROS):
                     winkel += 360
                 winkel_liste.append(winkel)
 
-                # Vektor einzeichnen
                 cv2.arrowedLine(
                     image_copy,
                     tuple(center_img),
@@ -132,11 +162,8 @@ class CrossingIntersectionNode(DTROS):
                     cv2.LINE_AA,
                 )
 
-        # Mittelpunkt einzeichnen
         cv2.circle(image_copy, tuple(center_img), 5, (255, 0, 0), -1)
 
-        # Analyse Flags
-        # Hier wird angenommen, dass die Kreuzung erreicht ist, wenn ein Punkt der Kontur im unteren 20% des Bildes liegt
         y_schwelle = int(height * distance)
         for c in contours:
             if cv2.contourArea(c) > 500:
@@ -146,7 +173,6 @@ class CrossingIntersectionNode(DTROS):
                         flags["Stop"] = True
                         break
 
-        # Prüfe Winkel und setze Abbiege-Flags
         for w in winkel_liste:
             if 300 <= w <= 360:
                 flags["Right"] = True
@@ -162,27 +188,3 @@ if __name__ == '__main__':
     rospy.init_node('crossing_intersection_node', anonymous=False)
     node = CrossingIntersectionNode(node_name='crossing_intersection_node')
     rospy.spin()
-
-
-# Methode zum Wechsel in Kreuzungsmodus
-
-#def __init__(self):
-#    self._in_crossing_mode = False
-#    rospy.Subscriber("/<vehicle>/crossing/finished", Bool, self.cbCrossingFinished)
-
-#def cbCrossingFlags(self, msg: Int32):
-#    STOP_BIT = 1 << 0
-#    if msg.data & STOP_BIT and not self._in_crossing_mode:
-#        rospy.loginfo("Kreuzung erkannt – aktiviere Modus.")
-#        self._in_crossing_mode = True
-#        self._control_mode = ControlType.Intersection
-
-#def cbCrossingFinished(self, msg: Bool):
-#    if msg.data:
-#        rospy.loginfo("Kreuzung beendet – zurück zu Lane-Following.")
-#        self._in_crossing_mode = False
-#        self._control_mode = ControlType.Lane
-
-
-
-   
