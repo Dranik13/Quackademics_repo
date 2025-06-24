@@ -166,21 +166,23 @@ if __name__ == '__main__':
 
 # Methode zum Wechsel in Kreuzungsmodus
 
-#from std_msgs.msg import Int32
+#def __init__(self):
+#    self._in_crossing_mode = False
+#    rospy.Subscriber("/<vehicle>/crossing/finished", Bool, self.cbCrossingFinished)
 
 #def cbCrossingFlags(self, msg: Int32):
-#    flags_bin = msg.data
-    
-    # Prüfe ob Stop-Bit gesetzt ist
-#    STOP_BIT = 1 << 0  # 1
-    
-#    if flags_bin & STOP_BIT:
-        # Stop-Bit ist True (gesetzt)
-#        print("Stop erkannt! Reagiere darauf...")
-#        self._control_mode = ControlType.Obstacle
-#    else:
-        # Stop nicht gesetzt
+#    STOP_BIT = 1 << 0
+#    if msg.data & STOP_BIT and not self._in_crossing_mode:
+#        rospy.loginfo("Kreuzung erkannt – aktiviere Modus.")
+#        self._in_crossing_mode = True
+#        self._control_mode = ControlType.Intersection
+
+#def cbCrossingFinished(self, msg: Bool):
+#    if msg.data:
+#        rospy.loginfo("Kreuzung beendet – zurück zu Lane-Following.")
+#        self._in_crossing_mode = False
 #        self._control_mode = ControlType.Lane
+
 
 
    
