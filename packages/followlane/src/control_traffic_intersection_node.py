@@ -37,6 +37,7 @@ class ControlCrossingNode(DTROS):
         self._crossing_active = False
         self._start_time = None
 
+    # Methode zum Verarbeiten der empfangenen Richtungsbits
     def cbCrossingFlags(self, msg):
         """Callback bei Empfang eines neuen Richtungsbits."""
         self._current_flags = msg.data
@@ -50,14 +51,15 @@ class ControlCrossingNode(DTROS):
         else:
             rospy.logwarn("[Crossing] Ungültige Richtung erhalten – keine Aktion")
 
+    # Methode zur Bestimmung des Fahrmodus basierend auf den empfangenen Flags
     def determine_mode(self, flags):
         """Bitmaske auswerten → konkrete Fahraktion bestimmen."""
-        # Bitdefinition (muss identisch zur Quelle sein)
+        # Bitdefinition für Richtungen
         RIGHT_BIT = 1 << 1     # 2
         LEFT_BIT = 1 << 2      # 4
         STRAIGHT_BIT = 1 << 3  # 8
 
-        # Wichtig: STOP_BIT (1 << 0) = 1 wird ignoriert
+        # STOP_BIT (1 << 0) = 1 wird ignoriert
 
         if flags & RIGHT_BIT:
             return CrossingMode.TurnRight
