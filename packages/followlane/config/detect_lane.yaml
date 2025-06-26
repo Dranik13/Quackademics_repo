@@ -6,21 +6,30 @@ duck:
   vh: 255
   vl: 200
 lane_image:
-  bottom_left_x: 140
-  bottom_left_y: 580
+  bottom_left_x: 0
+  bottom_left_y: 480
   bottom_right_x: 640
-  bottom_right_y: 580
-  top_left_x: 140
+  bottom_right_y: 480
+  top_left_x: 0
   top_left_y: 180
   top_right_x: 640
   top_right_y: 180
+duckie_detect:
+  bottom_left_x: 680
+  bottom_left_y: 480
+  bottom_right_x: 50
+  bottom_right_y: 480
+  top_left_x: 220
+  top_left_y: 250
+  top_right_x: 480
+  top_right_y: 250
 white:
   hh: 255
   hl: 0
   sh: 80
   sl: 0
   vh: 255
-  vl: 180
+  vl: 150
 yellow:
   hh: 80
   hl: 20
@@ -28,7 +37,31 @@ yellow:
   sl: 80
   vh: 255
   vl: 100
+line_detection_params:
+  # maximale lücke zwischen Mittel- und Seitenlinie
+  max_line_gap: 200
+  # alle Pixel deren y-Wert unter diesem Wert liegt werden nicht betrachtet (Parameter funktioniert irgendwie nicht richtig -> im Code erste Zeile in cvFindlane())
+  look_distance: 100
+  # Bildbreite um Bildmitte in der nach der Mittellinie gesucht wird
+  middle_line_look_width: 400 
+  # Wenn vom Mittellinienpunkt aus kein weißes Pixel gefunden wurde, wird in dieser definierten distanz ein Orientierungspunkt gesetzt
+  def_dist_middle_line: 60
+  # Anz. an Mittelliniensegmenten die betrachtet werden 
+  num_middle_pts: 7
+  # Orientierungspunkt der an die Regelung gesendet wird. Gezählt vom am Fz. nächsten 
+  control_pt_nr: 3
+search_for_parking_lot:
+  look_for_parkinglot: false
+  search_range: 50
+  min_nr_line_segments: 4
+  max_y_diff: 40
 debugging_output:
   line_coordinates: false
-  input_image: true
+  input_image: false
   output_image: true
+  mask_white: false
+  mask_yellow: false
+controller:
+  max_speed: 0.5
+  min_speed_percent: 0.4
+  max_steering_angle: 6
