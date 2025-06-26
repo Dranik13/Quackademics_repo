@@ -35,35 +35,46 @@ class CrossingIntersectionNode(DTROS):
 
         self.bridge = CvBridge()
 
+        # Initialisieren der Variablen für einmaliges publishen des Zustandes
+        self.stop_active = False
+        self.selected_direction = None
+
     def cbImageCallback(self, image_msg):
         np_arr = np.frombuffer(image_msg.data, np.uint8)
         cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
+        # Analyse: welche Richtungen sind im Bild sichtbar?
         flags, debug_img = self.compute_possible_directions(cv_image, distance=0.8)
 
-        # Bitmaske aus dem erkannten Zustand erstellen
+        # Bitmaske aus Flags
         flags_bin = sum(
             bit for key, bit in self.DIRECTIONS.items() if flags.get(key, False)
         )
 
-        # Prüfen, ob Stop aktiv ist – nur dann publishen
-        if not (flags_bin & self.DIRECTIONS["Stop"]):
-            return  # Keine Kreuzung erkannt → Zufällige Richtung nicht wählen
-        # Wenn Stop erkannt ist, wähle eine zufällige Richtung
+        # Ist Stop erkannt?
+        stop_detected = bool(flags_bin & self.DIRECTIONS["Stop"])
 
-        # Stop erkannt → zufällige Richtung wählen
-        selected_flags = self.choose_random_direction(flags_bin)
+        if stop_detected:
+            if not self.stop_active:
+                # Erstes Mal Stop → Richtung wählen und publishen
+                self.selected_flags = self.choose_random_direction(flags_bin)
+                selected_flags_bin = sum(
+                    bit for key, bit in self.DIRECTIONS.items() if self.selected_flags.get(key, False)
+                )
 
-        # Neue Bitmaske erstellen
-        selected_flags_bin = sum(
-            bit for key, bit in self.DIRECTIONS.items() if selected_flags.get(key, False)
-        )
+                self.pub_crossing.publish(selected_flags_bin)
 
-        self.pub_crossing.publish(selected_flags_bin)
+                # Zustand merken
+                self.stop_active = True
+        else:
+            # Kein Stop erkannt → Zustand zurücksetzen
+            self.stop_active = False
+            self.selected_flags = None
 
-        # Debug-Bild immer anzeigen (optional)
+        # Debug-Bild anzeigen (optional)
         debug_msg = self.bridge.cv2_to_imgmsg(debug_img, encoding="bgr8")
         self.pub_debug_img.publish(debug_msg)
+
 
 
     def choose_random_direction(self, state):
