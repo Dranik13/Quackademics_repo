@@ -97,7 +97,7 @@ class ControlCrossingNode(DTROS):
                     self._mode = CrossingMode.Idle
                     self.pub_crossing_enabled.publish(Bool(data=False))
                     twist.v = 0.0
-                    twist.omega = 0.0
+                    twist.omega = 0.0   
             else:
                 twist.v = 0.0
                 twist.omega = 0.0

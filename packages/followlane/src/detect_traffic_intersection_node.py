@@ -53,6 +53,7 @@ class CrossingIntersectionNode(DTROS):
 
         # Zustand
         self.stop_active = False
+        self.last_selected_direction = None  # Neu: letzte gewählte Richtung speichern
 
     def cbImageCallback(self, image_msg):
         np_arr = np.frombuffer(image_msg.data, np.uint8)
@@ -72,12 +73,33 @@ class CrossingIntersectionNode(DTROS):
             rospy.loginfo(f"[Intersection] Richtung gesendet: {bin(selected_flags_bin)}")
             self.stop_active = True
 
+            # Neu: Gewählte Richtung speichern für das Debug-Overlay
+            for dir_name in ["Right", "Left", "Straight"]:
+                if selected_flags.get(dir_name, False):
+                    self.last_selected_direction = dir_name
+                    break
+            else:
+                self.last_selected_direction = "None"
+
         elif not stop_detected:
             self.stop_active = False
+            self.last_selected_direction = None  # Stop weg -> Richtung zurücksetzen
 
         # Wenn Stop erkannt wurde: Schriftzug im Bild
         if stop_detected:
             cv2.putText(debug_img, "STOP", (40, 100), cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 0, 255), 5)
+
+            # Neu: Richtung im Debugbild anzeigen
+            if self.last_selected_direction:
+                cv2.putText(
+                    debug_img,
+                    f"Direction: {self.last_selected_direction}",
+                    (40, 160),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    2,
+                    (0, 255, 255),
+                    4
+                )
 
         # Debug-Bild senden (nur wenn Sub vorhanden)
         if self.pub_debug_img.get_num_connections() > 0:
