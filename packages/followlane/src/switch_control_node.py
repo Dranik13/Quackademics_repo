@@ -10,6 +10,7 @@ from duckietown.dtros import DTROS, NodeType
 class ControlType(Enum):
     Lane = 1
     Obstacle = 2
+    Parking = 3
 
 class SwitchControlNode(DTROS):
     def __init__(self,node_name):

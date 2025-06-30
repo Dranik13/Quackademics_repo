@@ -66,7 +66,7 @@ class SwitchControlNode(DTROS):
                 if msg_cmd.v > 0:
                     msg_cmd.v = self.compute_speed_cos(msg_cmd.omega, self.theta_max, self.v_max, self.v_min_percent)
             self.pub_cmd_vel.publish(msg_cmd)
-            print("v: ", msg_cmd.v, "omega: ", msg_cmd.omega)
+            #print("v: ", msg_cmd.v, "omega: ", msg_cmd.omega)
             rate.sleep()
     
     def fnShutDown(self):
