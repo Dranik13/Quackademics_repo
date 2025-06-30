@@ -56,14 +56,19 @@ class CrossingIntersectionNode(DTROS):
         self.last_selected_direction = None  # Neu: letzte gewählte Richtung speichern
 
     def cbImageCallback(self, image_msg):
+        
+        # Konvertierung des CompressedImage in ein OpenCV-Bild
         np_arr = np.frombuffer(image_msg.data, np.uint8)
         cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
+        # Richtung ermitteln und Debug-Bild generieren
         flags, debug_img = self.compute_possible_directions(cv_image, distance=0.8)
         flags_bin = sum(bit for key, bit in self.DIRECTIONS.items() if flags.get(key, False))
 
+        # Flag für Stop erkennen ermitteln
         stop_detected = bool(flags_bin & self.DIRECTIONS["Stop"])
 
+        # Wenn Stop erkannt wurde und noch nicht aktiv, wähle eine Richtung
         if stop_detected and not self.stop_active:
             selected_flags = self.choose_random_direction(flags_bin)
             selected_flags_bin = sum(
@@ -73,7 +78,7 @@ class CrossingIntersectionNode(DTROS):
             rospy.loginfo(f"[Intersection] Richtung gesendet: {bin(selected_flags_bin)}")
             self.stop_active = True
 
-            # Neu: Gewählte Richtung speichern für das Debug-Overlay
+            # Gewählte Richtung speichern für das Debug-Overlay
             for dir_name in ["Right", "Left", "Straight"]:
                 if selected_flags.get(dir_name, False):
                     self.last_selected_direction = dir_name
@@ -81,15 +86,16 @@ class CrossingIntersectionNode(DTROS):
             else:
                 self.last_selected_direction = "None"
 
+        # Wenn Stop nicht erkannt wurde, Flags zurücksetzen
         elif not stop_detected:
             self.stop_active = False
-            self.last_selected_direction = None  # Stop weg -> Richtung zurücksetzen
+            self.last_selected_direction = None
 
         # Wenn Stop erkannt wurde: Schriftzug im Bild
         if stop_detected:
             cv2.putText(debug_img, "STOP", (40, 100), cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 0, 255), 5)
 
-            # Neu: Richtung im Debugbild anzeigen
+            # Richtung im Debugbild anzeigen
             if self.last_selected_direction:
                 cv2.putText(
                     debug_img,

@@ -54,6 +54,7 @@ class ControlCrossingNode(DTROS):
         flags = msg.data
         self._mode = self.determine_mode(flags)
 
+        # Wenn eine gültige Richtung erkannt wurde, starte das entsprechende Manöver
         if self._mode in MOVEMENT_PARAMS:
             self._movement = MOVEMENT_PARAMS[self._mode]
             self._start_time = time.time()
@@ -69,6 +70,7 @@ class ControlCrossingNode(DTROS):
         LEFT_BIT = 1 << 2      # 4
         STRAIGHT_BIT = 1 << 3  # 8
 
+        # Prüfen, welche Bits gesetzt sind und entsprechende Aktion zurückgeben
         if flags & RIGHT_BIT:
             return CrossingMode.TurnRight
         elif flags & LEFT_BIT:
@@ -84,6 +86,7 @@ class ControlCrossingNode(DTROS):
         while not rospy.is_shutdown():
             twist = Twist2DStamped()
 
+            # Wenn ein Manöver aktiv ist, aktualisiere die Twist-Nachricht
             if self._crossing_active:
                 elapsed = time.time() - self._start_time if self._start_time else 0
 
@@ -91,6 +94,7 @@ class ControlCrossingNode(DTROS):
                 twist.omega = self._movement['omega']
                 duration = self._movement['duration']
 
+                # Wenn die Zeit abgelaufen ist, beende das Manöver
                 if elapsed >= duration:
                     rospy.loginfo("[Crossing] Manöver abgeschlossen.")
                     self._crossing_active = False
