@@ -21,7 +21,7 @@ class ControlLaneNode(DTROS):
         self.sub_lane = rospy.Subscriber(f'/{self._vehicle_name}/detect/lane', Float64, self.cbFollowLane, queue_size = 1)
         self.sub_control = rospy.Subscriber(f"/{self._vehicle_name}/switch/control", Int32, self.cbControl , queue_size = 1)
         
-        self.Kp = 1.1     # P Anteil meist 2.0 - 4.0
+        self.Kp = 0.5     # P Anteil meist 2.0 - 4.0
         self.Ki = 0.0    # I Anteil meist 0.0 - 0.5
         self.Kd = 0.0     # D Anteil meist 0.1 - 1.0
         self.dt = 0.1   # Zeitintervall
@@ -68,7 +68,8 @@ class ControlLaneNode(DTROS):
         rate = rospy.Rate(10)   # 10 Hz
 
         while not rospy.is_shutdown():
-            self.pub_cmd_vel.publish(self.twist)
+            if self.enable:
+                self.pub_cmd_vel.publish(self.twist)
             rate.sleep()
 
 
