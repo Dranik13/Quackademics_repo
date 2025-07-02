@@ -66,7 +66,6 @@ class DetectLaneNode(DTROS):
 
 
     def cbFindLane(self, image_msg):
-
         # 10 HZ -> 0.1 second
         if self.counter % 3 != 0:
             self.counter += 1
@@ -197,7 +196,7 @@ class DetectLaneNode(DTROS):
 
         msg_desired_center = Float64()
 
-        if desired_centers[len(desired_centers)-1][1] >= 130 and len(desired_centers) >= 2:
+        if len(desired_centers) >= 2 and desired_centers[len(desired_centers)-1][1] >= 130:
             msg_desired_center.data = float(desired_centers[len(desired_centers)-1][0])
             self.pub_lane.publish(msg_desired_center)
 
@@ -226,7 +225,7 @@ class DetectLaneNode(DTROS):
                 x, y, w, h = cv2.boundingRect(contour)
                 aspect_ratio = float(w) / h if h != 0 else 0
 
-                if 0.4 < aspect_ratio < 2.0 and 10 < w < 50 and 10 < h < 50:
+                if 0.4 < aspect_ratio < 2.0 and 20 < w < 60 and 20 < h < 60:
                     if x_search_coordinate - self.search_range <= x <= x_search_coordinate + self.search_range:
                         cv2.rectangle(bv_img, (x, y), (x+w, y+h), (0, 255, 255), 2)
                         cv2.putText(bv_img, f"{int(area)}", (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 255), 1)
@@ -286,6 +285,7 @@ class DetectLaneNode(DTROS):
             # stable_parking = sum(self.parking_buffer) >= 7
             
             self.pub_parking_spot.publish(Bool(data=found_parking))
+            #rospy.loginfo_throttle(1, f"Publishing parking: {found_parking}")
             #rospy.loginfo_throttle(1, f"Parkplatz-Erkennung: potenziell={len(potential_parking_lot_marks)}, akzeptiert={len(parking_lot_marks)}")
 
 
