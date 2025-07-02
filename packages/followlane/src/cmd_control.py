@@ -5,6 +5,7 @@ import os
 from duckietown_msgs.msg import Twist2DStamped
 from sensor_msgs.msg import Range
 from duckietown.dtros import DTROS, NodeType
+from std_msgs.msg import Float64, Int32, Bool
 import math
 import yaml
 
@@ -21,15 +22,29 @@ class SwitchControlNode(DTROS):
         self._vehicle_name = os.environ['VEHICLE_NAME']
         self.sub_lane = rospy.Subscriber(f"/{self._vehicle_name}/control/cmd", Twist2DStamped, self.cbCmdValue, queue_size = 1)
         self.sub_lane = rospy.Subscriber(f"/{self._vehicle_name}/front_center_tof_driver_node/range", Range, self.cbRange, queue_size = 1)
+        self.sub_control = rospy.Subscriber(f"/{self._vehicle_name}/switch/control", Int32, self.cb_control_mode)
+
+        self.control_mode = None
         self.range = Range()
         self.cmd_value = Twist2DStamped()
+        
+        # Timer um die Node verzögert zu starten
+        self.ready = False
+        rospy.Timer(rospy.Duration(1.0),lambda event: setattr(self, 'ready', True),oneshot=True)
+
         rospy.on_shutdown(self.fnShutDown)
 
     def cbCmdValue(self, msg):
         self.cmd_value =  msg
+        #rospy.loginfo("Received cmd value: v=%f, omega=%f", msg.v, msg.omega)
+
 
     def cbRange(self, msg):
         self.range = msg
+        #rospy.loginfo("Received range value: %f", msg.range)
+
+    def cb_control_mode(self, msg):
+        self.control_mode = msg.data
 
     def compute_speed_cos(self, theta, theta_max, v_max, v_min_percent):
         v_min = v_min_percent * v_max
@@ -53,10 +68,13 @@ class SwitchControlNode(DTROS):
 
         while not rospy.is_shutdown():
             
-            if self.range.range <= 0.2:
+            if self.range.range <= 0.25 or not self.ready:
                 msg_cmd = Twist2DStamped(v=0, omega = 0)
+                rospy.logwarn("Obstacle detected, stopping vehicle.")
             # if False:
             #     pass
+            elif self.sub_control == 4:
+                msg_cmd = self.cmd_value
             else:
                 msg_cmd = self.cmd_value
                 if msg_cmd.omega >= self.theta_max:
@@ -65,8 +83,10 @@ class SwitchControlNode(DTROS):
                     msg_cmd.omega = -self.theta_max
                 if msg_cmd.v > 0:
                     msg_cmd.v = self.compute_speed_cos(msg_cmd.omega, self.theta_max, self.v_max, self.v_min_percent)
+
             self.pub_cmd_vel.publish(msg_cmd)
-            #print("v: ", msg_cmd.v, "omega: ", msg_cmd.omega)
+            #rospy.loginfo("Publishing cmd value: v=%f, omega=%f", msg_cmd.v, msg_cmd.omega)
+            
             rate.sleep()
     
     def fnShutDown(self):
