@@ -108,9 +108,9 @@ class CrossingIntersectionNode(DTROS):
                 )
 
         # Debug-Bild senden (nur wenn Sub vorhanden)
-        if self.pub_debug_img.get_num_connections() > 0:
-            debug_msg = self.bridge.cv2_to_imgmsg(debug_img, encoding="bgr8")
-            self.pub_debug_img.publish(debug_msg)
+        # if self.pub_debug_img.get_num_connections() > 0:
+            # debug_msg = self.bridge.cv2_to_imgmsg(debug_img, encoding="bgr8")
+            # self.pub_debug_img.publish(debug_msg)
 
     def choose_random_direction(self, state):
         stop_active = bool(state & self.DIRECTIONS["Stop"])

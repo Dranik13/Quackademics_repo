@@ -21,7 +21,7 @@ class SwitchControlNode(DTROS):
         self.sub_duckie = rospy.Subscriber(f"/{self._vehicle_name}/detect/duckie", Bool, self.cbDuckieDetected, queue_size = 1)
         self.sub_lane = rospy.Subscriber(f"/{self._vehicle_name}/detect/lane", Float64, self.cbLaneDetected, queue_size = 1)
         self.pub_control = rospy.Publisher(f"/{self._vehicle_name}/switch/control", Int32, queue_size = 1)
-        self.sub_Obstacle_enabled = rospy.Subscriber(f"/{self._vehicle_name}/obstacle/enabled", Bool, self.cbObstacleEnabled, queue_size = 1)
+        #self.sub_Obstacle_enabled = rospy.Subscriber(f"/{self._vehicle_name}/obstacle/enabled", Bool, self.cbObstacleEnabled, queue_size = 1)
 
         # Topic-Name:
         self._crossing_enabled_topic = f"/{self._vehicle_name}/crossing/enabled"
@@ -42,6 +42,9 @@ class SwitchControlNode(DTROS):
         self._crossing_enabled = False
         self._received_direction = 0
 
+    # Setzen der Variable für den Obstacle-Modus
+    def cbObstacleEnabled(self, msg):
+        self._Obstacle_enabled = msg.data
 
     # Zurücksetzen des Kreuzungsmodus
     def cbCrossingEnabled(self, msg):
