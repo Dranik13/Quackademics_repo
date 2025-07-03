@@ -16,12 +16,11 @@ class CrossingMode(Enum):
     GoStraight = 3
     Idle = 4  # Kein gültiger Richtungsbefehl aktiv
 
-
 # Bewegungsparameter für jeden Modus
 MOVEMENT_PARAMS = {
-    CrossingMode.TurnRight:    {'v': 0.1,  'omega': -2.0, 'duration': 2.0},
-    CrossingMode.TurnLeft:     {'v': 0.1,  'omega': 2.0,  'duration': 2.0},
-    CrossingMode.GoStraight:   {'v': 0.25, 'omega': 0.0,  'duration': 2.5},
+    CrossingMode.TurnRight:    {'v': 0.5,  'omega': -2.0, 'duration': 1.0},
+    CrossingMode.TurnLeft:     {'v': 0.5,  'omega': 1.5,  'duration': 2.0},
+    CrossingMode.GoStraight:   {'v': 0.25, 'omega': 0.0,  'duration': 2.0},
 }
 
 
@@ -84,18 +83,23 @@ class ControlCrossingNode(DTROS):
         rate = rospy.Rate(10)  # 10 Hz
         while not rospy.is_shutdown():
             twist = Twist2DStamped()
-            rospy.loginfo("CrossingMode =" + self._mode.name)
             if self._mode != CrossingMode.Idle:              
-                # Wenn ein Manöver aktiv ist, aktualisiere die Twist-Nachricht
                 if self._crossing_active:
                     elapsed = time.time() - self._start_time if self._start_time else 0
-
-                    twist.v = self._movement['v']
-                    twist.omega = self._movement['omega']
+                    
+                    # Wartephase von 2 Sekunden mit Stillstand
+                    if elapsed < 2.0:
+                        twist.v = 0.0
+                        twist.omega = 0.0
+                    else:
+                        # Danach wird die Bewegung ausgeführt
+                        twist.v = self._movement['v']
+                        twist.omega = self._movement['omega']
+                    
                     duration = self._movement['duration']
 
-                    # Wenn die Zeit abgelaufen ist, beende das Manöver
-                    if elapsed >= duration:
+                    # Wenn die Gesamtzeit (inkl. 2 Sekunden Wartezeit) abgelaufen ist, beende das Manöver
+                    if elapsed >= duration + 2.0:
                         rospy.loginfo("[Crossing] Manöver abgeschlossen.")
                         self._crossing_active = False
                         self._mode = CrossingMode.Idle
@@ -105,8 +109,8 @@ class ControlCrossingNode(DTROS):
                 else:
                     twist.v = 0.0
                     twist.omega = 0.0
-                rospy.loginfo(f"[Crossing] Aktueller Modus: {self._mode.name}, v: {twist.v}, omega: {twist.omega}")
                 self.pub_cmd_vel.publish(twist)
+
             rate.sleep()
 
 

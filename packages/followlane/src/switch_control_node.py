@@ -11,6 +11,7 @@ class ControlType(Enum):
     Lane = 1
     Obstacle = 2
     Intersection = 3
+    Parking = 4
 
 class SwitchControlNode(DTROS):
     def __init__(self,node_name):
@@ -87,7 +88,7 @@ class SwitchControlNode(DTROS):
 
     def cbLaneDetected(self, msg):
         # Change control Mode if Lane Detected and no Duckie
-        if msg.data > 0 and self._Obstacle_enabled == False:
+        if msg.data > 0 and self._Obstacle_enabled == False and self._crossing_enabled == False:
             self._control_mode = ControlType.Lane
         
 

@@ -136,7 +136,7 @@ class CrossingIntersectionNode(DTROS):
             "Straight": chosen == "Straight"
         }
 
-    def compute_possible_directions(self, image, distance=0.8):
+    def compute_possible_directions(self, image, distance=0.7):
         flags = {key: False for key in self.DIRECTIONS}
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 

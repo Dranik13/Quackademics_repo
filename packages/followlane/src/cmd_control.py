@@ -5,6 +5,7 @@ import os
 from duckietown_msgs.msg import Twist2DStamped
 from sensor_msgs.msg import Range
 from duckietown.dtros import DTROS, NodeType
+from std_msgs.msg import Float64, Int32, Bool
 import math
 import yaml
 
@@ -21,9 +22,13 @@ class SwitchControlNode(DTROS):
         self._vehicle_name = os.environ['VEHICLE_NAME']
         self.sub_lane = rospy.Subscriber(f"/{self._vehicle_name}/control/cmd", Twist2DStamped, self.cbCmdValue, queue_size = 1)
         self.sub_lane = rospy.Subscriber(f"/{self._vehicle_name}/front_center_tof_driver_node/range", Range, self.cbRange, queue_size = 1)
+        self.sub_control = rospy.Subscriber(f"/{self._vehicle_name}/switch/control", Int32, self.cb_control_mode)   
         self.range = Range()
         self.cmd_value = Twist2DStamped()
         rospy.on_shutdown(self.fnShutDown)
+
+    def cb_control_mode(self, msg):
+        self.control_mode = msg.data
 
     def cbCmdValue(self, msg):
         self.cmd_value =  msg
@@ -58,7 +63,12 @@ class SwitchControlNode(DTROS):
                 rospy.loginfo("Obstacle detected, stopping the vehicle")
             # if False:
             #     pass
-            
+            elif self.sub_control == 4:
+                msg_cmd = self.cmd_value
+
+            elif self.sub_control == 3:
+                msg_cmd = self.cmd_value
+
             else:
                 msg_cmd = self.cmd_value
                 if msg_cmd.omega >= self.theta_max:
@@ -68,7 +78,7 @@ class SwitchControlNode(DTROS):
                 if msg_cmd.v > 0:
                     msg_cmd.v = self.compute_speed_cos(msg_cmd.omega, self.theta_max, self.v_max, self.v_min_percent)
             self.pub_cmd_vel.publish(msg_cmd)
-            #print("v: ", msg_cmd.v, "omega: ", msg_cmd.omega)
+            print("v: ", msg_cmd.v, "omega: ", msg_cmd.omega)
             rate.sleep()
     
     def fnShutDown(self):
