@@ -68,7 +68,8 @@ class ControlLaneNode(DTROS):
         rate = rospy.Rate(10)   # 10 Hz
 
         while not rospy.is_shutdown():
-            self.pub_cmd_vel.publish(self.twist)
+            if self.enable:
+                self.pub_cmd_vel.publish(self.twist)
             rate.sleep()
 
 

@@ -111,7 +111,7 @@ class ControlCrossingNode(DTROS):
 
 
 if __name__ == '__main__':
-    rospy.init_node('control_crossing_node')
+    # rospy.init_node('control_crossing_node')
     node = ControlCrossingNode(node_name='control_crossing_node')
     node.run()
     rospy.spin()

@@ -199,6 +199,6 @@ class CrossingIntersectionNode(DTROS):
 
 
 if __name__ == '__main__':
-    rospy.init_node('crossing_intersection_node', anonymous=False)
+    # rospy.init_node('crossing_intersection_node', anonymous=False)
     node = CrossingIntersectionNode(node_name='crossing_intersection_node')
     rospy.spin()

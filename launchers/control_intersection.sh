@@ -4,6 +4,6 @@ source /environment.sh
 
 dt-launchfile-init
 
-rosrun followlane crossing_intersection_node.py
+rosrun followlane control_traffic_intersection_node.py
 
 dt-launchfile-join
