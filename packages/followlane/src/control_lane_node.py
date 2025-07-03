@@ -21,7 +21,7 @@ class ControlLaneNode(DTROS):
         self.sub_lane = rospy.Subscriber(f'/{self._vehicle_name}/detect/lane', Float64, self.cbFollowLane, queue_size = 1)
         self.sub_control = rospy.Subscriber(f"/{self._vehicle_name}/switch/control", Int32, self.cbControl , queue_size = 1)
         
-        self.Kp = 0.8     # P Anteil meist 2.0 - 4.0
+        self.Kp = 0.7     # P Anteil meist 2.0 - 4.0
         self.Ki = 0.0     # I Anteil meist 0.0 - 0.5
         self.Kd = 0.0     # D Anteil meist 0.1 - 1.0
         self.dt = 0.1   # Zeitintervall

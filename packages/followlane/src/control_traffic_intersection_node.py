@@ -82,32 +82,32 @@ class ControlCrossingNode(DTROS):
 
     def run(self):
         rate = rospy.Rate(10)  # 10 Hz
+        if CrossingMode.Idle == False:
+            while not rospy.is_shutdown():
+                twist = Twist2DStamped()
 
-        while not rospy.is_shutdown():
-            twist = Twist2DStamped()
+                # Wenn ein Manöver aktiv ist, aktualisiere die Twist-Nachricht
+                if self._crossing_active:
+                    elapsed = time.time() - self._start_time if self._start_time else 0
 
-            # Wenn ein Manöver aktiv ist, aktualisiere die Twist-Nachricht
-            if self._crossing_active:
-                elapsed = time.time() - self._start_time if self._start_time else 0
+                    twist.v = self._movement['v']
+                    twist.omega = self._movement['omega']
+                    duration = self._movement['duration']
 
-                twist.v = self._movement['v']
-                twist.omega = self._movement['omega']
-                duration = self._movement['duration']
-
-                # Wenn die Zeit abgelaufen ist, beende das Manöver
-                if elapsed >= duration:
-                    rospy.loginfo("[Crossing] Manöver abgeschlossen.")
-                    self._crossing_active = False
-                    self._mode = CrossingMode.Idle
-                    self.pub_crossing_enabled.publish(Bool(data=False))
+                    # Wenn die Zeit abgelaufen ist, beende das Manöver
+                    if elapsed >= duration:
+                        rospy.loginfo("[Crossing] Manöver abgeschlossen.")
+                        self._crossing_active = False
+                        self._mode = CrossingMode.Idle
+                        self.pub_crossing_enabled.publish(Bool(data=False))
+                        twist.v = 0.0
+                        twist.omega = 0.0   
+                else:
                     twist.v = 0.0
-                    twist.omega = 0.0   
-            else:
-                twist.v = 0.0
-                twist.omega = 0.0
-
-            self.pub_cmd_vel.publish(twist)
-            rate.sleep()
+                    twist.omega = 0.0
+                rospy.loginfo(f"[Crossing] Aktueller Modus: {self._mode.name}, v: {twist.v}, omega: {twist.omega}")
+                self.pub_cmd_vel.publish(twist)
+                rate.sleep()
 
 
 if __name__ == '__main__':

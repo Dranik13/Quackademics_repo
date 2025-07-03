@@ -50,11 +50,12 @@ class SwitchControlNode(DTROS):
 
     def run(self):
         rate = rospy.Rate(20)   # 10 Hz
-
+        
         while not rospy.is_shutdown():
             
             if self.range.range <= 0.2:
                 msg_cmd = Twist2DStamped(v=0, omega = 0)
+                rospy.loginfo("Obstacle detected, stopping the vehicle")
             # if False:
             #     pass
             else:
