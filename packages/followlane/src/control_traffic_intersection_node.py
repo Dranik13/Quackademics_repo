@@ -69,7 +69,7 @@ class ControlCrossingNode(DTROS):
         RIGHT_BIT = 1 << 1     # 2
         LEFT_BIT = 1 << 2      # 4
         STRAIGHT_BIT = 1 << 3  # 8
-
+        rospy.loginfo(f"[Crossing] Flags erhalten: {bin(flags)}")
         # Prüfen, welche Bits gesetzt sind und entsprechende Aktion zurückgeben
         if flags & RIGHT_BIT:
             return CrossingMode.TurnRight
@@ -82,10 +82,10 @@ class ControlCrossingNode(DTROS):
 
     def run(self):
         rate = rospy.Rate(10)  # 10 Hz
-        if CrossingMode.Idle == False:
-            while not rospy.is_shutdown():
-                twist = Twist2DStamped()
-
+        while not rospy.is_shutdown():
+            twist = Twist2DStamped()
+            rospy.loginfo("CrossingMode =" + self._mode.name)
+            if self._mode != CrossingMode.Idle:              
                 # Wenn ein Manöver aktiv ist, aktualisiere die Twist-Nachricht
                 if self._crossing_active:
                     elapsed = time.time() - self._start_time if self._start_time else 0
@@ -107,7 +107,7 @@ class ControlCrossingNode(DTROS):
                     twist.omega = 0.0
                 rospy.loginfo(f"[Crossing] Aktueller Modus: {self._mode.name}, v: {twist.v}, omega: {twist.omega}")
                 self.pub_cmd_vel.publish(twist)
-                rate.sleep()
+            rate.sleep()
 
 
 if __name__ == '__main__':

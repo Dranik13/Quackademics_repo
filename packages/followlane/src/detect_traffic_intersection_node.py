@@ -108,9 +108,9 @@ class CrossingIntersectionNode(DTROS):
                 )
 
         # Debug-Bild senden (nur wenn Sub vorhanden)
-        if self.pub_debug_img.get_num_connections() > 0:
-            debug_msg = self.bridge.cv2_to_imgmsg(debug_img, encoding="bgr8")
-            self.pub_debug_img.publish(debug_msg)
+
+        debug_msg = self.bridge.cv2_to_imgmsg(debug_img, encoding="bgr8")
+        self.pub_debug_img.publish(debug_msg)
 
     def choose_random_direction(self, state):
         stop_active = bool(state & self.DIRECTIONS["Stop"])
@@ -200,5 +200,5 @@ class CrossingIntersectionNode(DTROS):
 
 if __name__ == '__main__':
     # rospy.init_node('crossing_intersection_node', anonymous=False)
-    node = CrossingIntersectionNode(node_name='crossing_intersection_node')
+    node = CrossingIntersectionNode(node_name='detect_traffic_intersection_node')
     rospy.spin()

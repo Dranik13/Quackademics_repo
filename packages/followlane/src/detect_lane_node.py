@@ -193,7 +193,7 @@ class DetectLaneNode(DTROS):
 
         msg_desired_center = Float64()
 
-        if desired_centers[len(desired_centers)-1][1] >= 130 and len(desired_centers) >= 2:
+        if len(desired_centers) >= 2 and desired_centers[len(desired_centers)-1][1] >= 130:
             msg_desired_center.data = float(desired_centers[len(desired_centers)-1][0])
             self.pub_lane.publish(msg_desired_center)
 
