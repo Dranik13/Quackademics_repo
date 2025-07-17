@@ -13,6 +13,7 @@ class ControlType(Enum):
     Intersection = 3
     Parking = 4
 
+
 class SwitchControlNode(DTROS):
     def __init__(self,node_name):
         super(SwitchControlNode, self).__init__(node_name=node_name, node_type=NodeType.GENERIC)
@@ -21,6 +22,7 @@ class SwitchControlNode(DTROS):
         self._vehicle_name = os.environ['VEHICLE_NAME']
         self.sub_duckie = rospy.Subscriber(f"/{self._vehicle_name}/detect/duckie", Bool, self.cbDuckieDetected, queue_size = 1)
         self.sub_lane = rospy.Subscriber(f"/{self._vehicle_name}/detect/lane", Float64, self.cbLaneDetected, queue_size = 1)
+        self.sub_parking = rospy.Subscriber(f"/{self._vehicle_name}/detect/parking_active", Bool, self.cbParkingActive, queue_size=1)
         self.pub_control = rospy.Publisher(f"/{self._vehicle_name}/switch/control", Int32, queue_size = 1)
         #self.sub_Obstacle_enabled = rospy.Subscriber(f"/{self._vehicle_name}/obstacle/enabled", Bool, self.cbObstacleEnabled, queue_size = 1)
 
@@ -46,7 +48,6 @@ class SwitchControlNode(DTROS):
     # Setzen der Variable für den Obstacle-Modus
     def cbObstacleEnabled(self, msg):
         self._Obstacle_enabled = msg.data
-
     # Zurücksetzen des Kreuzungsmodus
     def cbCrossingEnabled(self, msg):
         self._crossing_enabled = msg.data
@@ -80,17 +81,18 @@ class SwitchControlNode(DTROS):
 
 
     def cbDuckieDetected(self, msg):
-        # Change Mode to Duckie if Duckie is detected and lock it for X time?
+        if self._parking_active:
+            return
         if msg.data:
             self._control_mode = ControlType.Obstacle
-        elif self._Obstacle_enabled == False:
+        elif not self._Obstacle_enabled:
             self._control_mode = ControlType.Lane
 
     def cbLaneDetected(self, msg):
         # Change control Mode if Lane Detected and no Duckie
         if msg.data > 0 and self._Obstacle_enabled == False and self._crossing_enabled == False:
             self._control_mode = ControlType.Lane
-        
+            
 
     def run(self):
         rate = rospy.Rate(10)
@@ -99,6 +101,7 @@ class SwitchControlNode(DTROS):
             msg_control = Int32()
             msg_control.data = self._control_mode.value
             self.pub_control.publish(msg_control)
+            #rospy.loginfo(f"Control mode: {self._control_mode.name} (Value: {msg_control.data})")
             rate.sleep()
             
 

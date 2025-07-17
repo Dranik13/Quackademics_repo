@@ -11,7 +11,7 @@ from sensor_msgs.msg import CompressedImage, Image
 from enum import Enum
 import yaml
 from cv_bridge import CvBridge
-
+from collections import deque
 from duckietown.dtros import DTROS, NodeType
 
 
@@ -31,9 +31,13 @@ class DetectLaneNode(DTROS):
         self.sub_image_original = rospy.Subscriber(self._camera_topic, CompressedImage, self.cbFindLane, queue_size = 1)
 
         self.pub_lane = rospy.Publisher(f'/{self._vehicle_name}/detect/lane', Float64, queue_size = 1)
+        
+        self.pub_parking_spot = rospy.Publisher(f'/{self._vehicle_name}/detect/parking_spot', Bool, queue_size=1)
+        self.pub_parking_debug = rospy.Publisher(f"/{self._vehicle_name}/debug/parking_img", Image, queue_size=1)
+
 
         self._bridge = CvBridge()
-
+        self.parking_buffer = deque(maxlen=10)  # Puffer für letzte 10 Ergebnisse
         self.counter = 0
         self.avoiding_obstacles = False
         self.drive_left = False
@@ -62,7 +66,6 @@ class DetectLaneNode(DTROS):
 
 
     def cbFindLane(self, image_msg):
-
         # 10 HZ -> 0.1 second
         if self.counter % 3 != 0:
             self.counter += 1
@@ -212,13 +215,30 @@ class DetectLaneNode(DTROS):
             if not white_contours and len(white_contours) <= 0:
                 white_contours, _ = cv2.findContours(mask_white, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                 
-            x_search_coordinate = sideline_pts[len(sideline_pts)//2][0]
+            x_search_coordinate = sideline_pts[len(sideline_pts)//2][0]   
+            # search for rectangle-like contours in the white mask
             for contour in white_contours:
-                for pt in contour:
-                    x = pt[0][0]
+                area = cv2.contourArea(contour)
+                if area < 200 or area > 800:
+                    continue
+
+                x, y, w, h = cv2.boundingRect(contour)
+                aspect_ratio = float(w) / h if h != 0 else 0
+
+                if 0.4 < aspect_ratio < 2.0 and 20 < w < 60 and 20 < h < 60:
                     if x_search_coordinate - self.search_range <= x <= x_search_coordinate + self.search_range:
+                        cv2.rectangle(bv_img, (x, y), (x+w, y+h), (0, 255, 255), 2)
+                        cv2.putText(bv_img, f"{int(area)}", (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 255), 1)
+
                         potential_parking_lot_marks.append(contour)
-                        break
+            
+            # for contour in white_contours:
+            #     for pt in contour:
+            #         x = pt[0][0]
+            #         if x_search_coordinate - self.search_range <= x <= x_search_coordinate + self.search_range:
+            #             potential_parking_lot_marks.append(contour)
+            #             break
+
             if len(potential_parking_lot_marks) >= self.min_nr_line_segments:
                 # y-coordinates of marks have to be close to each other
                 centers = []
@@ -232,11 +252,50 @@ class DetectLaneNode(DTROS):
                 for i in range(1, len(centers)):
                     y_prev = centers[i-1][1]
                     y_curr = centers[i][1]
+                    #rospy.loginfo(f"[i={i}] y_prev={y_prev}, y_curr={y_curr}, diff={abs(y_curr - y_prev)}")
+
                     if abs(y_curr - y_prev) <= self.max_y_diff:
                         parking_lot_marks.append(potential_parking_lot_marks[i])
 
+            # nearby_parking = False
+            # if parking_lot_marks:
+            #     # Prüfe Y-Koordinaten der Mittelpunkte
+            #     y_positions = []
+            #     for contour in parking_lot_marks:
+            #         cx, cy = calcMiddlePtOfContours(contour)
+            #         if cy is not None:
+            #             y_positions.append(cy)
+    
+            #     # Mindestanzahl von Markierungen in der Nähe prüfen
+            #     near_threshold = 300  # (abhängig vom Bildausschnitt, evtl. anpassen)
+            #     if sum(1 for y in y_positions if y > near_threshold) >= self.min_nr_line_segments:
+            #         nearby_parking = True
+            #         rospy.loginfo("✅ Parkplatz erkannt!")
+
+         
+            
+            found_parking = len(parking_lot_marks) >= self.min_nr_line_segments
+            
+            # if found_parking:
+            #     rospy.loginfo("✅ Parkplatz erkannt!")
+            # # # Puffer aktualisieren
+            # self.parking_buffer.append(found_parking)
+
+            # # Stabilitäts-Entscheidung: mind. 7 von 10
+            # stable_parking = sum(self.parking_buffer) >= 7
+            
+            self.pub_parking_spot.publish(Bool(data=found_parking))
+            #rospy.loginfo_throttle(1, f"Publishing parking: {found_parking}")
+            #rospy.loginfo_throttle(1, f"Parkplatz-Erkennung: potenziell={len(potential_parking_lot_marks)}, akzeptiert={len(parking_lot_marks)}")
+
+
             if self.show_output_img:
-                cv2.drawContours(bv_img, parking_lot_marks, -1, (0, 255, 0), 2)
+                cv2.drawContours(bv_img, parking_lot_marks, -1, (255, 0, 0), 2)
+                # Draw threshold line for parking detection
+                #cv2.drawContours(bv_img, potential_parking_lot_marks, -1, (0, 255, 255), 1)
+                #cv2.line(bv_img, (x_search_coordinate - 50, 0), (x_search_coordinate - 50, bv_img.shape[0]), (255, 255, 0), 1)
+                #cv2.line(bv_img, (x_search_coordinate + 50, 0), (x_search_coordinate + 50, bv_img.shape[0]), (255, 255, 0), 1)
+                
 
         if self.show_output_img:
             cv2.imshow("line detection", bv_img)
@@ -245,6 +304,12 @@ class DetectLaneNode(DTROS):
         if self.show_mask_yellow:
             cv2.imshow("mask yellow", mask_yellow)
         cv2.waitKey(1)
+
+        from cv_bridge import CvBridge
+        bridge = CvBridge()
+        ros_img = bridge.cv2_to_imgmsg(bv_img, encoding="bgr8")
+        self.pub_parking_debug.publish(ros_img)
+
 
     
     def load_conf(self,path):
