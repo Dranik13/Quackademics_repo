@@ -55,6 +55,9 @@ class CrossingIntersectionNode(DTROS):
         self.stop_active = False
         self.last_selected_direction = None  # Neu: letzte gewählte Richtung speichern
 
+        self.cooldown_time = 2.0  # Sekunden
+        self.last_direction_time = 0  # Zeitpunkt der letzten Richtungswahl
+
     def cbImageCallback(self, image_msg):
         
         # Konvertierung des CompressedImage in ein OpenCV-Bild
@@ -69,13 +72,17 @@ class CrossingIntersectionNode(DTROS):
         stop_detected = bool(flags_bin & self.DIRECTIONS["Stop"])
 
         # Wenn Stop erkannt wurde und noch nicht aktiv, wähle eine Richtung
-        if stop_detected and not self.stop_active:
+        current_time = rospy.get_time()
+        cooldown_passed = (current_time - self.last_direction_time) > self.cooldown_time
+
+        if stop_detected and not self.stop_active and cooldown_passed:
             selected_flags = self.choose_random_direction(flags_bin)
             selected_flags_bin = sum(
                 bit for key, bit in self.DIRECTIONS.items() if selected_flags.get(key, False)
             )
             self.pub_direction.publish(Int32(data=selected_flags_bin))
             rospy.loginfo(f"[Intersection] Richtung gesendet: {bin(selected_flags_bin)}")
+            self.last_direction_time = current_time
             self.stop_active = True
 
             # Gewählte Richtung speichern für das Debug-Overlay
@@ -90,6 +97,7 @@ class CrossingIntersectionNode(DTROS):
         elif not stop_detected:
             self.stop_active = False
             self.last_selected_direction = None
+
 
         # Wenn Stop erkannt wurde: Schriftzug im Bild
         if stop_detected:

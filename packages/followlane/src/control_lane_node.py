@@ -20,14 +20,17 @@ class ControlLaneNode(DTROS):
 
         self.sub_lane = rospy.Subscriber(f'/{self._vehicle_name}/detect/lane', Float64, self.cbFollowLane, queue_size = 1)
         self.sub_control = rospy.Subscriber(f"/{self._vehicle_name}/switch/control", Int32, self.cbControl , queue_size = 1)
+        self.desired_theta = 0.0
+        self.sub_orientation = rospy.Subscriber(f"/{self._vehicle_name}/detect/orientation", Float64, self.cbOrientation, queue_size=1)
         
-        self.Kp = 0.7     # P Anteil meist 2.0 - 4.0
+        self.Kp = 5.0     # P Anteil meist 2.0 - 4.0
         self.Ki = 0.0     # I Anteil meist 0.0 - 0.5
         self.Kd = 0.0     # D Anteil meist 0.1 - 1.0
-        self.dt = 0.1   # Zeitintervall
+        # self.dt = 0.1   # Zeitintervall
 
         self.integral = 0   # sum of error (integral)
         self.prev_error = 0 # Previous Error (on start == 0)
+        self.last_time = rospy.Time.now()
 
         self.twist = Twist2DStamped(v=0.3, omega=0)
 
@@ -44,20 +47,52 @@ class ControlLaneNode(DTROS):
         center = desired_center.data
         self.followLane(center)
 
+    def cbOrientation(self, msg):
+        self.desired_theta = msg.data
+
     def followLane(self, center):
-        # Image has 640 Pixel
-        error = (320 - center) / 25
+        # Aktuelle Zeit erfassen
+        now = rospy.Time.now()
+
+        # Zeitdifferenz zum vorherigen Aufruf berechnen
+        dt = (now - self.last_time).to_sec()
+        self.last_time = now
+
+        # Sicherstellen, dass dt niemals 0 ist (z. B. bei ersten Aufrufen), um Division durch 0 zu vermeiden
+        dt = max(dt, 1e-3)
+
+        # --- Lateralfehler berechnen ---
+        # Das Bild hat 640 Pixel Breite → Bildmitte bei 320
+        image_center = 320
+
+        # Abweichung des Zielpunkts von der Bildmitte → normierter Fehler [-1, 1]
+        error_lat = (image_center - center) / image_center
+
+        # --- Orientierungsfehler berechnen ---
+        # Der Sollwinkel (desired_theta) ist 0, also Geradeausfahrt
+        # Der Fehler ist also einfach die Abweichung vom Zielwinkel
+        error_theta = -self.desired_theta
+
+        # --- Kombination der beiden Fehlerarten ---
+        # Falls das Fahrzeug nach links zeigen würde (theta > 0), gewichte den Winkel etwas mit
+        if error_theta > 0:
+            error = error_lat + 0.5 * error_theta  # Gewichtung von theta kann angepasst werden
+        else:
+            error = error_lat  # Nur lateral, wenn Winkelfehler negativ oder null
+        
+        #error = (320 - center) / 25
         P = error * self.Kp
 
-        self.integral += error * self.dt
+        self.integral += error * dt
         I = self.Ki * self.integral
 
-        derivative = (error - self.prev_error) / self.dt if self.dt > 0 else 0.0
+        derivative = (error - self.prev_error) / dt if dt > 0 else 0.0
         D = self.Kd * derivative
         self.prev_error = error     # save last error
         
         a = P + I + D
-        v = 0.5
+        v = 0.2
+        #print("CL: v: ", v, "omega: ", a)
         self.twist = Twist2DStamped(v=v, omega=a)
         #twist = Twist2DStamped(v=v, omega=a)
 

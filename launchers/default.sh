@@ -22,6 +22,7 @@ dt-exec bash /launch/Quackademics_repo/detect-lane.sh &
 dt-exec bash /launch/Quackademics_repo/control-lane.sh &
 # dt-exec bash /launch/Quackademics_repo/control-obstacle.sh &
 dt-exec bash /launch/Quackademics_repo/cmd-control.sh &
+# dt-exec bash /launch/Quackademics_repo/control-crossing.sh
 dt-exec bash /launch/Quackademics_repo/detect_intersection.sh &
 dt-exec bash /launch/Quackademics_repo/control_intersection.sh 
 # ----------------------------------------------------------------------------
