@@ -22,10 +22,18 @@ class SwitchControlNode(DTROS):
         self._vehicle_name = os.environ['VEHICLE_NAME']
         self.sub_lane = rospy.Subscriber(f"/{self._vehicle_name}/control/cmd", Twist2DStamped, self.cbCmdValue, queue_size = 1)
         self.sub_lane = rospy.Subscriber(f"/{self._vehicle_name}/front_center_tof_driver_node/range", Range, self.cbRange, queue_size = 1)
-        self.sub_control = rospy.Subscriber(f"/{self._vehicle_name}/switch/control", Int32, self.cb_control_mode)   
+        self.sub_control = rospy.Subscriber(f"/{self._vehicle_name}/switch/control", Int32, self.cb_control_mode)
+
+        self.control_mode = None
         self.range = Range()
         self.cmd_value = Twist2DStamped()
         self.control_mode = Int32()
+
+        # Timer um die Node verzögert zu starten
+        self.ready = False
+        rospy.Timer(rospy.Duration(1.0),lambda event: setattr(self, 'ready', True),oneshot=True)
+
+
         rospy.on_shutdown(self.fnShutDown)
 
     def cb_control_mode(self, msg):
@@ -33,9 +41,13 @@ class SwitchControlNode(DTROS):
 
     def cbCmdValue(self, msg):
         self.cmd_value =  msg
+        #rospy.loginfo("Received cmd value: v=%f, omega=%f", msg.v, msg.omega)
+
 
     def cbRange(self, msg):
         self.range = msg
+        #rospy.loginfo("Received range value: %f", msg.range)
+
 
     def compute_speed_cos(self, theta, theta_max, v_max, v_min_percent):
         v_min = v_min_percent * v_max
@@ -58,8 +70,6 @@ class SwitchControlNode(DTROS):
         rate = rospy.Rate(20)   # 10 Hz
         
         while not rospy.is_shutdown():
-            #print("mode: ", self.control_mode)
-            #print("range: ", self.range.range)
             # if self.range.range <= 0.2:
             #     msg_cmd = Twist2DStamped(v=0, omega = 0)
                 # rospy.loginfo("Obstacle detected, stopping the vehicle")

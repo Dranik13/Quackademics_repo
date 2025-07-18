@@ -12,7 +12,6 @@ from cv_bridge import CvBridge
 import yaml
 from threading import Lock
 
-
 class DetectDuckieNode(DTROS):
     def __init__(self, node_name):
         # initialize the DTROS parent class
