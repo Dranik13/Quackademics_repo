@@ -6,6 +6,7 @@ import os
 import rospy
 import numpy as np
 import cv2
+import time
 from std_msgs.msg import Float64, Bool
 from sensor_msgs.msg import CompressedImage, Image
 from enum import Enum
@@ -16,7 +17,11 @@ from collections import deque
 from duckietown.dtros import DTROS, NodeType
 from collections import deque
 
-
+# start_time = time.perf_counter()
+# desired_centers = self.interpolate_points(desired_centers, num_points=15)
+# end_time = time.perf_counter()    
+# dauer_us = (end_time - start_time) * 1_000_000
+# print(f"interpolate_points Dauer: {dauer_us:.0f} µs")
 
 
 class DetectLaneNode(DTROS):
@@ -116,6 +121,20 @@ class DetectLaneNode(DTROS):
         mask_yellow = cv2.morphologyEx(mask_yellow, cv2.MORPH_CLOSE, kernel)
 
         yellow_contours, _ = cv2.findContours(mask_yellow, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        filtered_yellow_contours = []
+        # for contour in yellow_contours:
+        #     area = cv2.contourArea(contour)
+        #     if area < 15 or area > 225:
+        #         continue
+            
+        #     x, y, w, h = cv2.boundingRect(contour)
+        #     aspect_ratio = float(w) / h if h != 0 else 0
+        #     # print(f"Contour: area={area:.1f} px, aspect_ratio={aspect_ratio:.2f}")
+            
+
+        #     if aspect_ratio > 0.4:
+        #         filtered_yellow_contours.append(contour)
+
         white_contours = []
 
         # calculate middle_pts of line segments
@@ -123,8 +142,16 @@ class DetectLaneNode(DTROS):
         mask_x_center = mask_yellow.shape[1] // 2
         for contour in yellow_contours:
             cx, cy = calcMiddlePtOfContours(contour)
-            # accept middlepoint of line segment if it is within self.middle_line_look_width 
-            if cx >= mask_x_center - self.middle_line_look_width/2 and cx <= mask_x_center + self.middle_line_look_width:
+            
+            # check distance between points
+            if middle_pts:
+                last_cx, last_cy = middle_pts[-1]
+                dist = np.sqrt((cx - last_cx)**2 + (cy - last_cy)**2)
+                # print(f"Distanz zum letzten Punkt: {dist:.2f} px")
+                if dist > 120:
+                    continue
+            # accept middlepoint of line segment if it is within self.middle_line_look_width                                 cy nicht vergessen!!!!!!!!!!!!!!!!
+            if cx >= mask_x_center - self.middle_line_look_width/2 and cx <= mask_x_center + self.middle_line_look_width and cy > 70:
                 middle_pts.append((cx,cy))
                 cv2.circle(bv_img, (cx, cy), 5, (0, 0, 255), -1)
                 
@@ -134,7 +161,8 @@ class DetectLaneNode(DTROS):
         desired_centers = []
         height, width = mask_white.shape
         sideline_pts = []
-
+        previous_dx = 0
+        previous_dy = 0
         # search for right line if a middle line was found
         if len(middle_pts) >= 2 and self.avoiding_obstacles == False and self.drive_left_timer_run == False:
             self.drive_left = False
@@ -148,6 +176,13 @@ class DetectLaneNode(DTROS):
                 # find first white pixel on the right from the middel point (right sideline)
                 dx = np.cos(orientation + (np.pi/2))
                 dy = np.sin(orientation + (np.pi/2))
+
+                delta_dx = previous_dx - dx
+                delta_dy = previous_dy - dy
+
+                if viewed_pt >= 1 and (abs(delta_dx) > 0.9 or abs(delta_dy) > 0.9):
+                    dx = -dx
+                    dy = -dy
 
                 # check pixelwise
                 for i in range(self.max_line_gap):
@@ -176,6 +211,9 @@ class DetectLaneNode(DTROS):
                             cv2.circle(bv_img, desired_pt, 5, (255, 0, 0), -1)
 
                 viewed_pt+=1
+                previous_dx = dx
+                previous_dy = dy
+
         # Search white line without middle line
         else:
             white_contours, _ = cv2.findContours(mask_white, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -195,105 +233,121 @@ class DetectLaneNode(DTROS):
 
         # set the absolute x-value of close points higher for faster reaction
         for i, pt in enumerate(desired_centers):
-            if pt[1] > 150:
-                diff = ((width/2) - pt[0]) * -2   # double the difference by adding it one additional time
+            if pt[0] > 150:
+                diff = ((width/2) - pt[0]) * -2.0   # double the difference by adding it one additional time
                 new_x = pt[0] + diff
                 desired_centers[i] = (new_x, pt[1])
-        
+
         msg_desired_center = Float64()
-        # print("[detect_lane] desired_centers: ",desired_centers)
+
+        if len(desired_centers) >= 2 and desired_centers[len(desired_centers)-1][1] >= 130:
+            msg_desired_center.data = float(desired_centers[len(desired_centers)-1][0])
+            self.pub_lane.publish(msg_desired_center)
+
+        elif len(desired_centers) >= self.control_pt_nr:
+            msg_desired_center.data = float(desired_centers[self.control_pt_nr-1][0])
+            self.pub_lane.publish(msg_desired_center)
+
+        elif desired_centers:
+            msg_desired_center.data = float(desired_centers[len(desired_centers)-1][0])
+            self.pub_lane.publish(msg_desired_center)
+
+################################################################ INTERPOLATION ################################################################
         
-        # Nur ausführen, wenn ausreichend viele Zielpunkte vorhanden sind (mindestens 4)
-        if len(desired_centers) >= 4:
-            # Aktuelle Liste von desired_centers (aus diesem Frame) zum zeitlichen Verlauf hinzufügen
-            self.center_history.append(desired_centers)
+        # # Nur ausführen, wenn ausreichend viele Zielpunkte vorhanden sind (mindestens 4)
+        # if len(desired_centers) >= 4:
+        #     # Aktuelle Liste von desired_centers (aus diesem Frame) zum zeitlichen Verlauf hinzufügen
+        #     self.center_history.append(desired_centers)
 
-            # Erst dann mitteln, wenn mindestens zwei vergangene Frames vorliegen
-            # Hinweis: Eine größere Anzahl (z.B. 5) liefert ein glatteres, aber trägeres Ergebnis
-            if len(self.center_history) >= 2:
-                # Zeitliche Glättung der Punkte: Mittelwert über alle gespeicherten Listen
-                # Jeder Punkt wird anhand seiner "Position im Verlauf" gemittelt
-                avg_centers = []
-                for pts in zip(*self.center_history):
-                    xs = [pt[0] for pt in pts]  # x-Werte über die Zeit
-                    ys = [pt[1] for pt in pts]  # y-Werte über die Zeit
-                    avg_centers.append((np.mean(xs), np.mean(ys)))  # Mittelwert berechnen
+        #     # Erst dann mitteln, wenn mindestens zwei vergangene Frames vorliegen
+        #     # Hinweis: Eine größere Anzahl (z.B. 5) liefert ein glatteres, aber trägeres Ergebnis
+        #     if len(self.center_history) >= 2:
+        #         # Zeitliche Glättung der Punkte: Mittelwert über alle gespeicherten Listen
+        #         # Jeder Punkt wird anhand seiner "Position im Verlauf" gemittelt
+        #         avg_centers = []
+        #         for pts in zip(*self.center_history):
+        #             xs = [pt[0] for pt in pts]  # x-Werte über die Zeit
+        #             ys = [pt[1] for pt in pts]  # y-Werte über die Zeit
+        #             avg_centers.append((np.mean(xs), np.mean(ys)))  # Mittelwert berechnen
 
-                # Ersetze aktuelle Punkte durch geglättete Mittelwerte
-                desired_centers = avg_centers
+        #         # Ersetze aktuelle Punkte durch geglättete Mittelwerte
+        #         desired_centers = avg_centers
 
-        # Debug-Ausgabe (optional)
-        # print("[detect_lane] desired_centers_new: ", desired_centers)
+        # # Debug-Ausgabe (optional)
+        # # print("[detect_lane] desired_centers_new: ", desired_centers)
                 
         
-        #! SPLINE
-        # Wenn genügend Zielpunkte (mind. 4) vorhanden sind
-        if len(desired_centers) >= 4:
-            # Verlauf der letzten desired_center speichern (für zeitliche Mittelung)
-            self.center_history.append(desired_centers)
+        # #! SPLINE
+        # # Wenn genügend Zielpunkte (mind. 4) vorhanden sind
+        # if len(desired_centers) >= 4:
+        #     # Verlauf der letzten desired_center speichern (für zeitliche Mittelung)
+        #     self.center_history.append(desired_centers)
 
-            # Nur mitteln, wenn mindestens zwei zeitlich aufeinanderfolgende Frames verfügbar sind
-            if len(self.center_history) >= 2:
-                # Zeitliche Glättung: Mittelwert über die letzten Punkte (gleiche Position pro Frame)
-                avg_centers = []
-                for pts in zip(*self.center_history):
-                    xs = [pt[0] for pt in pts]
-                    ys = [pt[1] for pt in pts]
-                    avg_centers.append((np.mean(xs), np.mean(ys)))
+        #     # Nur mitteln, wenn mindestens zwei zeitlich aufeinanderfolgende Frames verfügbar sind
+        #     if len(self.center_history) >= 2:
+        #         # Zeitliche Glättung: Mittelwert über die letzten Punkte (gleiche Position pro Frame)
+        #         avg_centers = []
+        #         for pts in zip(*self.center_history):
+        #             xs = [pt[0] for pt in pts]
+        #             ys = [pt[1] for pt in pts]
+        #             avg_centers.append((np.mean(xs), np.mean(ys)))
 
-                # Ersetze aktuelle desired_centers durch geglättete Version
-                desired_centers = avg_centers
+        #         # Ersetze aktuelle desired_centers durch geglättete Version
+        #         desired_centers = avg_centers
 
-            print("desired_centers: ", desired_centers)
+        #     # print("desired_centers: ", desired_centers)
 
-            # Interpolieren entlang y-Achse: mehr Zwischenpunkte erzeugen für glatteren Spline
-            desired_centers = self.interpolate_points(desired_centers, num_points=15)
+        #     # Interpolieren entlang y-Achse: mehr Zwischenpunkte erzeugen für glatteren Spline
 
-            try:
-                # Versuche, einen glatten Spline durch die Punkte zu legen
-                pts = np.array(desired_centers)
-                x = pts[:, 0]
-                y = pts[:, 1]
 
-                # Berechne Spline mit leichtem Glättungsfaktor s=20
-                tck, u = splprep([x, y], s=20)
-                u_new = np.linspace(0, 1, num=100)
-                x_new, y_new = splev(u_new, tck)
+        #     try:
+        #         # Versuche, einen glatten Spline durch die Punkte zu legen
+        #         pts = np.array(desired_centers)
+        #         x = pts[:, 0]
+        #         y = pts[:, 1]
 
-                # Zielpunkt definieren (z.B. 30% entlang des Splineverlaufs)
-                idx = int(0.3 * len(x_new))
-                target_x = x_new[idx]
+        #         # Berechne Spline mit leichtem Glättungsfaktor s=20
+        #         tck, u = splprep([x, y], s=20)
+        #         u_new = np.linspace(0, 1, num=100)
+        #         x_new, y_new = splev(u_new, tck)
 
-                # Publiziere Zielpunkt als x-Abweichung vom Bildmittelpunkt
-                msg_desired_center = Float64()
-                msg_desired_center.data = float(target_x)
-                self.pub_lane.publish(msg_desired_center)
+        #         # Zielpunkt definieren (z.B. 30% entlang des Splineverlaufs)
+        #         idx = int(0.3 * len(x_new))
+        #         target_x = x_new[idx]
 
-                if self.show_output_img:
-                    # Spline im Bird's Eye View einzeichnen
-                    for px, py in zip(x_new, y_new):
-                        if 0 <= int(px) < bv_img.shape[1] and 0 <= int(py) < bv_img.shape[0]:
-                            cv2.circle(bv_img, (int(px), int(py)), 1, (200, 100, 255), -1)
+        #         # Publiziere Zielpunkt als x-Abweichung vom Bildmittelpunkt
+        #         msg_desired_center = Float64()
+        #         msg_desired_center.data = float(target_x)
+        #         self.pub_lane.publish(msg_desired_center)
 
-                    # Zielpunkt (30%) im BEV rot markieren
-                    cv2.circle(bv_img, (int(x_new[idx]), int(y_new[idx])), 5, (0, 0, 255), -1)
+        #         if self.show_output_img:
+        #             # Spline im Bird's Eye View einzeichnen
+        #             for px, py in zip(x_new, y_new):
+        #                 if 0 <= int(px) < bv_img.shape[1] and 0 <= int(py) < bv_img.shape[0]:
+        #                     cv2.circle(bv_img, (int(px), int(py)), 1, (200, 100, 255), -1)
 
-                    # Rücktransformation des Zielpunkts ins Originalbild (für Debug-Zwecke)
-                    pt_target_bird = np.array([[[x_new[idx], y_new[idx] + self.look_distance + 180]]], dtype='float32')
-                    pt_target_orig = cv2.perspectiveTransform(pt_target_bird, self.bev_inv_matrix)
-                    x_t, y_t = pt_target_orig[0][0]
-                    cv2.circle(cv_image, (int(x_t), int(y_t)), 5, (0, 0, 255), -1)
+        #             # Zielpunkt (30%) im BEV rot markieren
+        #             cv2.circle(bv_img, (int(x_new[idx]), int(y_new[idx])), 5, (0, 0, 255), -1)
 
-                    # Bilder anzeigen
-                    cv2.imshow("line detection", bv_img)
-                    # cv2.imshow("Original Image mit Spline", cv_image)
+        #             # Rücktransformation des Zielpunkts ins Originalbild (für Debug-Zwecke)
+        #             pt_target_bird = np.array([[[x_new[idx], y_new[idx] + self.look_distance + 180]]], dtype='float32')
+        #             pt_target_orig = cv2.perspectiveTransform(pt_target_bird, self.bev_inv_matrix)
+        #             x_t, y_t = pt_target_orig[0][0]
+        #             cv2.circle(cv_image, (int(x_t), int(y_t)), 5, (0, 0, 255), -1)
 
-            except Exception as e:
-                # Fehler beim Fitten des Spline → Fallback: letzter Punkt der Liste
-                rospy.logwarn(f"Spline fitting failed: {e}")
-                msg_desired_center = Float64()
-                msg_desired_center.data = float(desired_centers[-1][0])
-                self.pub_lane.publish(msg_desired_center)
+        #             # Bilder anzeigen
+        #             cv2.imshow("line detection", bv_img)
+        #             # cv2.imshow("Original Image mit Spline", cv_image)
+
+        #     except Exception as e:
+        #         # Fehler beim Fitten des Spline → Fallback: letzter Punkt der Liste
+        #         rospy.logwarn(f"Spline fitting failed: {e}")
+        #         msg_desired_center = Float64()
+        #         msg_desired_center.data = float(desired_centers[-1][0])
+        #         self.pub_lane.publish(msg_desired_center)
+
+
+
 
         # detect parking lot
         potential_parking_lot_marks = []
@@ -382,9 +436,9 @@ class DetectLaneNode(DTROS):
                 #cv2.drawContours(bv_img, potential_parking_lot_marks, -1, (0, 255, 255), 1)
                 #cv2.line(bv_img, (x_search_coordinate - 50, 0), (x_search_coordinate - 50, bv_img.shape[0]), (255, 255, 0), 1)
                 #cv2.line(bv_img, (x_search_coordinate + 50, 0), (x_search_coordinate + 50, bv_img.shape[0]), (255, 255, 0), 1)
-                
 
         if self.show_output_img:
+            # cv2.drawContours(bv_img, filtered_yellow_contours, -1, (0, 255, 255), 2)  # Gelb, Dicke 2
             cv2.imshow("line detection", bv_img)
         if self.show_mask_white:
             cv2.imshow("mask white", mask_white)
@@ -416,7 +470,7 @@ class DetectLaneNode(DTROS):
         # Entferne eventuelle Duplikate
         interp = list({(round(xi, 4), round(yi, 4)) for xi, yi in zip(x_interp, y_uniform)})
         interp.sort(key=lambda pt: pt[1], reverse=True)  # Wieder nach y sortieren
-        print("interpolate points: ", interp)
+        # print("interpolate points: ", interp)
         return interp
       
         from cv_bridge import CvBridge
