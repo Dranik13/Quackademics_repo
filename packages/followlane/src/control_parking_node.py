@@ -6,13 +6,13 @@ from duckietown_msgs.msg import Twist2DStamped
 from duckietown.dtros import DTROS, NodeType
 import os
 from enum import Enum
+from switch_control_node import ControlType
 
-
-class ControlType(Enum):
-    Lane = 1
-    Obstacle = 2
-    Intersection = 3
-    Parking = 4
+# class ControlType(Enum):
+#     Lane = 1
+#     Obstacle = 2
+#     Intersection = 3
+#     Parking = 4
 
 class ControlParkingNode(DTROS):
     def __init__(self, node_name):
@@ -33,13 +33,13 @@ class ControlParkingNode(DTROS):
 
 
     def cb_mode(self, msg):
-        if msg.data == 4 and not self.parking_routine_started:
+        if msg.data == ControlType.Parking and not self.parking_routine_started:
             rospy.loginfo("🅿️ Einparkvorgang aktiviert")
             self.active = True
             self.current_step = 0
             self.step_counter = 0
             self.parking_routine_started = True
-        elif msg.data != 4:
+        else:
             self.parking_routine_started = False
             self.active = False            
 

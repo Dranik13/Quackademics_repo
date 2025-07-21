@@ -55,6 +55,9 @@ class CrossingIntersectionNode(DTROS):
         self.stop_active = False
         self.last_selected_direction = None  # Neu: letzte gewählte Richtung speichern
 
+        self.cooldown_time = 2.0  # Sekunden
+        self.last_direction_time = 0  # Zeitpunkt der letzten Richtungswahl
+
     def cbImageCallback(self, image_msg):
         
         # Konvertierung des CompressedImage in ein OpenCV-Bild
@@ -62,20 +65,24 @@ class CrossingIntersectionNode(DTROS):
         cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
         # Richtung ermitteln und Debug-Bild generieren
-        flags, debug_img = self.compute_possible_directions(cv_image, distance=0.8)
+        flags, debug_img = self.compute_possible_directions(cv_image, distance=0.9)
         flags_bin = sum(bit for key, bit in self.DIRECTIONS.items() if flags.get(key, False))
 
         # Flag für Stop erkennen ermitteln
         stop_detected = bool(flags_bin & self.DIRECTIONS["Stop"])
 
         # Wenn Stop erkannt wurde und noch nicht aktiv, wähle eine Richtung
-        if stop_detected and not self.stop_active:
+        current_time = rospy.get_time()
+        cooldown_passed = (current_time - self.last_direction_time) > self.cooldown_time
+
+        if stop_detected and not self.stop_active and cooldown_passed:
             selected_flags = self.choose_random_direction(flags_bin)
             selected_flags_bin = sum(
                 bit for key, bit in self.DIRECTIONS.items() if selected_flags.get(key, False)
             )
             self.pub_direction.publish(Int32(data=selected_flags_bin))
             rospy.loginfo(f"[Intersection] Richtung gesendet: {bin(selected_flags_bin)}")
+            self.last_direction_time = current_time
             self.stop_active = True
 
             # Gewählte Richtung speichern für das Debug-Overlay
@@ -90,6 +97,7 @@ class CrossingIntersectionNode(DTROS):
         elif not stop_detected:
             self.stop_active = False
             self.last_selected_direction = None
+
 
         # Wenn Stop erkannt wurde: Schriftzug im Bild
         if stop_detected:
@@ -154,7 +162,7 @@ class CrossingIntersectionNode(DTROS):
         mask[:roi_start, :] = 0
 
         contours_all, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        filtered = [c for c in contours_all if cv2.contourArea(c) >= 100]
+        filtered = [c for c in contours_all if cv2.contourArea(c) >= 500]
         contours = sorted(filtered, key=cv2.contourArea, reverse=True)[:4]
 
         image_copy = image.copy()

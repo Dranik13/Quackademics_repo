@@ -6,15 +6,22 @@ import os
 import rospy
 import numpy as np
 import cv2
+import time
 from std_msgs.msg import Float64, Bool,Float64MultiArray
 from sensor_msgs.msg import CompressedImage, Image
 from enum import Enum
 import yaml
 from cv_bridge import CvBridge
+from scipy.interpolate import splprep, splev
 from collections import deque
 from duckietown.dtros import DTROS, NodeType
+from collections import deque
 
-
+# start_time = time.perf_counter()
+# desired_centers = self.interpolate_points(desired_centers, num_points=15)
+# end_time = time.perf_counter()    
+# dauer_us = (end_time - start_time) * 1_000_000
+# print(f"interpolate_points Dauer: {dauer_us:.0f} µs")
 
 
 class DetectLaneNode(DTROS):
@@ -31,11 +38,11 @@ class DetectLaneNode(DTROS):
         self.sub_image_original = rospy.Subscriber(self._camera_topic, CompressedImage, self.cbFindLane, queue_size = 1)
 
         self.pub_lane = rospy.Publisher(f'/{self._vehicle_name}/detect/lane', Float64, queue_size = 1)
+        self.pub_orientation = rospy.Publisher(f'/{self._vehicle_name}/detect/orientation', Float64, queue_size=1)
         
         self.pub_parking_spot = rospy.Publisher(f'/{self._vehicle_name}/detect/parking_spot', Bool, queue_size=1)
         self.pub_parking_debug = rospy.Publisher(f"/{self._vehicle_name}/debug/parking_img", Image, queue_size=1)
-        # Publisher für ROI Punkt in BirdsView (für Duckiebot-Erkennung)
-        self.pub_parking_roi_px = rospy.Publisher(f"/{self._vehicle_name}/detect/parking_roi_px", Float64MultiArray, queue_size=1)
+
 
         self._bridge = CvBridge()
         self.parking_buffer = deque(maxlen=4)  # Puffer für letzte 10 Ergebnisse
@@ -46,21 +53,25 @@ class DetectLaneNode(DTROS):
         self.drive_left_timer_run = False
         self.roi_line_msg = Float64MultiArray()
 
+        self.center_history = deque(maxlen=5)
+
+        # Perspektivtransformation vorbereiten
+        self.bev_transform_matrix = np.array([
+            [313.0, -262.1286541724774, -40.70187412839005],
+            [0.0, 56.65661793452868, 1221.507309820698],
+            [0.0, -0.8191520442889918, 312.8728066433488]
+        ])
+        self.bev_inv_matrix = np.linalg.inv(self.bev_transform_matrix)
+
     def transformToBirdsView(self, img):
         img = img.copy()
             
         img_cropped = img[180:480, 0:640]
         
-        transform_matrix = np.array([
-            [313.0, -262.1286541724774, -40.70187412839005],
-            [0.0, 56.65661793452868, 1221.507309820698],
-            [0.0, -0.8191520442889918, 312.8728066433488]
-            ])
-
         # perform birds-eye-transformation
-        return cv2.warpPerspective(img_cropped, transform_matrix, 
-                                            (img_cropped.shape[1], img_cropped.shape[0]), 
-                                            flags=cv2.INTER_CUBIC | cv2.WARP_INVERSE_MAP)
+        return cv2.warpPerspective(img_cropped, self.bev_transform_matrix, 
+                               (img_cropped.shape[1], img_cropped.shape[0]), 
+                               flags=cv2.INTER_CUBIC | cv2.WARP_INVERSE_MAP)
     
     def checkObstacleAvoidance(self, avoiding_obstacles_msg):
         #print("msg: ", avoiding_obstacles_msg.data)
@@ -113,6 +124,20 @@ class DetectLaneNode(DTROS):
         mask_yellow = cv2.morphologyEx(mask_yellow, cv2.MORPH_CLOSE, kernel)
 
         yellow_contours, _ = cv2.findContours(mask_yellow, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        filtered_yellow_contours = []
+        # for contour in yellow_contours:
+        #     area = cv2.contourArea(contour)
+        #     if area < 15 or area > 225:
+        #         continue
+            
+        #     x, y, w, h = cv2.boundingRect(contour)
+        #     aspect_ratio = float(w) / h if h != 0 else 0
+        #     # print(f"Contour: area={area:.1f} px, aspect_ratio={aspect_ratio:.2f}")
+            
+
+        #     if aspect_ratio > 0.4:
+        #         filtered_yellow_contours.append(contour)
+
         white_contours = []
 
         # calculate middle_pts of line segments
@@ -120,8 +145,16 @@ class DetectLaneNode(DTROS):
         mask_x_center = mask_yellow.shape[1] // 2
         for contour in yellow_contours:
             cx, cy = calcMiddlePtOfContours(contour)
-            # accept middlepoint of line segment if it is within self.middle_line_look_width 
-            if cx >= mask_x_center - self.middle_line_look_width/2 and cx <= mask_x_center + self.middle_line_look_width:
+            
+            # check distance between points
+            if middle_pts:
+                last_cx, last_cy = middle_pts[-1]
+                dist = np.sqrt((cx - last_cx)**2 + (cy - last_cy)**2)
+                # print(f"Distanz zum letzten Punkt: {dist:.2f} px")
+                if dist > 120:
+                    continue
+            # accept middlepoint of line segment if it is within self.middle_line_look_width                                 cy nicht vergessen!!!!!!!!!!!!!!!!
+            if cx >= mask_x_center - self.middle_line_look_width/2 and cx <= mask_x_center + self.middle_line_look_width and cy > 70:
                 middle_pts.append((cx,cy))
                 cv2.circle(bv_img, (cx, cy), 5, (0, 0, 255), -1)
                 
@@ -131,7 +164,8 @@ class DetectLaneNode(DTROS):
         desired_centers = []
         height, width = mask_white.shape
         sideline_pts = []
-
+        previous_dx = 0
+        previous_dy = 0
         # search for right line if a middle line was found
         if len(middle_pts) >= 2 and self.avoiding_obstacles == False and self.drive_left_timer_run == False:
             self.drive_left = False
@@ -145,6 +179,14 @@ class DetectLaneNode(DTROS):
                 # find first white pixel on the right from the middel point (right sideline)
                 dx = np.cos(orientation + (np.pi/2))
                 dy = np.sin(orientation + (np.pi/2))
+
+                delta_dx = previous_dx - dx
+                delta_dy = previous_dy - dy
+
+                if viewed_pt >= 1 and abs(delta_dx) > 0.9:
+                    dx = -dx
+                elif viewed_pt >=1 and abs(delta_dy) > 0.9:
+                    dy = -dy
 
                 # check pixelwise
                 for i in range(self.max_line_gap):
@@ -173,6 +215,9 @@ class DetectLaneNode(DTROS):
                             cv2.circle(bv_img, desired_pt, 5, (255, 0, 0), -1)
 
                 viewed_pt+=1
+                previous_dx = dx
+                previous_dy = dy
+
         # Search white line without middle line
         else:
             white_contours, _ = cv2.findContours(mask_white, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -192,14 +237,16 @@ class DetectLaneNode(DTROS):
 
         # set the absolute x-value of close points higher for faster reaction
         for i, pt in enumerate(desired_centers):
-            if pt[1] > 150:
-                diff = ((width/2) - pt[0]) * -2   # double the difference by adding it one additional time
+            if pt[0] > 150:
+                diff = ((width/2) - pt[0]) * -2.0   # double the difference by adding it one additional time
                 new_x = pt[0] + diff
                 desired_centers[i] = (new_x, pt[1])
+                # if i == len(desired_centers) -1:
+                #     print("DOPPLE LETZTEN PUNKT ", i)
 
         msg_desired_center = Float64()
 
-        if len(desired_centers) >= 2 and desired_centers[len(desired_centers)-1][1] >= 130:
+        if len(desired_centers) >= 2 and desired_centers[len(desired_centers)-1][1] >= 110:
             msg_desired_center.data = float(desired_centers[len(desired_centers)-1][0])
             self.pub_lane.publish(msg_desired_center)
 
@@ -210,6 +257,103 @@ class DetectLaneNode(DTROS):
         elif desired_centers:
             msg_desired_center.data = float(desired_centers[len(desired_centers)-1][0])
             self.pub_lane.publish(msg_desired_center)
+
+################################################################ INTERPOLATION ################################################################
+        
+        # # Nur ausführen, wenn ausreichend viele Zielpunkte vorhanden sind (mindestens 4)
+        # if len(desired_centers) >= 4:
+        #     # Aktuelle Liste von desired_centers (aus diesem Frame) zum zeitlichen Verlauf hinzufügen
+        #     self.center_history.append(desired_centers)
+
+        #     # Erst dann mitteln, wenn mindestens zwei vergangene Frames vorliegen
+        #     # Hinweis: Eine größere Anzahl (z.B. 5) liefert ein glatteres, aber trägeres Ergebnis
+        #     if len(self.center_history) >= 2:
+        #         # Zeitliche Glättung der Punkte: Mittelwert über alle gespeicherten Listen
+        #         # Jeder Punkt wird anhand seiner "Position im Verlauf" gemittelt
+        #         avg_centers = []
+        #         for pts in zip(*self.center_history):
+        #             xs = [pt[0] for pt in pts]  # x-Werte über die Zeit
+        #             ys = [pt[1] for pt in pts]  # y-Werte über die Zeit
+        #             avg_centers.append((np.mean(xs), np.mean(ys)))  # Mittelwert berechnen
+
+        #         # Ersetze aktuelle Punkte durch geglättete Mittelwerte
+        #         desired_centers = avg_centers
+
+        # # Debug-Ausgabe (optional)
+        # # print("[detect_lane] desired_centers_new: ", desired_centers)
+                
+        
+        # #! SPLINE
+        # # Wenn genügend Zielpunkte (mind. 4) vorhanden sind
+        # if len(desired_centers) >= 4:
+        #     # Verlauf der letzten desired_center speichern (für zeitliche Mittelung)
+        #     self.center_history.append(desired_centers)
+
+        #     # Nur mitteln, wenn mindestens zwei zeitlich aufeinanderfolgende Frames verfügbar sind
+        #     if len(self.center_history) >= 2:
+        #         # Zeitliche Glättung: Mittelwert über die letzten Punkte (gleiche Position pro Frame)
+        #         avg_centers = []
+        #         for pts in zip(*self.center_history):
+        #             xs = [pt[0] for pt in pts]
+        #             ys = [pt[1] for pt in pts]
+        #             avg_centers.append((np.mean(xs), np.mean(ys)))
+
+        #         # Ersetze aktuelle desired_centers durch geglättete Version
+        #         desired_centers = avg_centers
+
+        #     # print("desired_centers: ", desired_centers)
+
+        #     # Interpolieren entlang y-Achse: mehr Zwischenpunkte erzeugen für glatteren Spline
+
+
+        #     try:
+        #         # Versuche, einen glatten Spline durch die Punkte zu legen
+        #         pts = np.array(desired_centers)
+        #         x = pts[:, 0]
+        #         y = pts[:, 1]
+
+        #         # Berechne Spline mit leichtem Glättungsfaktor s=20
+        #         tck, u = splprep([x, y], s=20)
+        #         u_new = np.linspace(0, 1, num=100)
+        #         x_new, y_new = splev(u_new, tck)
+
+        #         # Zielpunkt definieren (z.B. 30% entlang des Splineverlaufs)
+        #         idx = int(0.3 * len(x_new))
+        #         target_x = x_new[idx]
+
+        #         # Publiziere Zielpunkt als x-Abweichung vom Bildmittelpunkt
+        #         msg_desired_center = Float64()
+        #         msg_desired_center.data = float(target_x)
+        #         self.pub_lane.publish(msg_desired_center)
+
+        #         if self.show_output_img:
+        #             # Spline im Bird's Eye View einzeichnen
+        #             for px, py in zip(x_new, y_new):
+        #                 if 0 <= int(px) < bv_img.shape[1] and 0 <= int(py) < bv_img.shape[0]:
+        #                     cv2.circle(bv_img, (int(px), int(py)), 1, (200, 100, 255), -1)
+
+        #             # Zielpunkt (30%) im BEV rot markieren
+        #             cv2.circle(bv_img, (int(x_new[idx]), int(y_new[idx])), 5, (0, 0, 255), -1)
+
+        #             # Rücktransformation des Zielpunkts ins Originalbild (für Debug-Zwecke)
+        #             pt_target_bird = np.array([[[x_new[idx], y_new[idx] + self.look_distance + 180]]], dtype='float32')
+        #             pt_target_orig = cv2.perspectiveTransform(pt_target_bird, self.bev_inv_matrix)
+        #             x_t, y_t = pt_target_orig[0][0]
+        #             cv2.circle(cv_image, (int(x_t), int(y_t)), 5, (0, 0, 255), -1)
+
+        #             # Bilder anzeigen
+        #             cv2.imshow("line detection", bv_img)
+        #             # cv2.imshow("Original Image mit Spline", cv_image)
+
+        #     except Exception as e:
+        #         # Fehler beim Fitten des Spline → Fallback: letzter Punkt der Liste
+        #         rospy.logwarn(f"Spline fitting failed: {e}")
+        #         msg_desired_center = Float64()
+        #         msg_desired_center.data = float(desired_centers[-1][0])
+        #         self.pub_lane.publish(msg_desired_center)
+
+
+
 
         # detect parking lot
         potential_parking_lot_marks = []
@@ -348,22 +492,46 @@ class DetectLaneNode(DTROS):
                 #cv2.drawContours(bv_img, potential_parking_lot_marks, -1, (0, 255, 255), 1)
                 #cv2.line(bv_img, (x_search_coordinate - 50, 0), (x_search_coordinate - 50, bv_img.shape[0]), (255, 255, 0), 1)
                 #cv2.line(bv_img, (x_search_coordinate + 50, 0), (x_search_coordinate + 50, bv_img.shape[0]), (255, 255, 0), 1)
-                
 
-        #if self.show_output_img:
-            # cv2.imshow("line detection", bv_img)
-            # cv2.imshow("Orignal", cv_image)
+        if self.show_output_img:
+            cv2.imshow("line detection", bv_img)
         if self.show_mask_white:
             cv2.imshow("mask white", mask_white)
         if self.show_mask_yellow:
             cv2.imshow("mask yellow", mask_yellow)
         cv2.waitKey(1)
 
+    def interpolate_points(self, points, num_points=15):
+        # Sortieren
+        points = sorted(points, key=lambda pt: pt[1])
+        x = np.array([pt[0] for pt in points])
+        y = np.array([pt[1] for pt in points])
+
+        if len(np.unique(y)) < 2:
+            return points
+
+        # Gleichmäßige y-Werte erzeugen
+        y_uniform = np.linspace(y[0], y[-1], num_points)
+
+        # Interpolieren
+        x_interp = np.interp(y_uniform, y, x)
+
+        # Optional: letzte Punkte exakt setzen
+        x_interp[-1] = x[-1]
+        y_uniform[-1] = y[-1]
+        x_interp[0] = x[0]
+        y_uniform[0] = y[0]
+
+        # Entferne eventuelle Duplikate
+        interp = list({(round(xi, 4), round(yi, 4)) for xi, yi in zip(x_interp, y_uniform)})
+        interp.sort(key=lambda pt: pt[1], reverse=True)  # Wieder nach y sortieren
+        # print("interpolate points: ", interp)
+        return interp
+      
         from cv_bridge import CvBridge
         bridge = CvBridge()
         ros_img = bridge.cv2_to_imgmsg(bv_img, encoding="bgr8")
         self.pub_parking_debug.publish(ros_img)
-
 
     
     def load_conf(self,path):
