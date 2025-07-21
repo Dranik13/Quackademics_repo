@@ -146,6 +146,6 @@ class SwitchControlNode(DTROS):
             rate.sleep()
 
 
-if _name_ == '_main_':
+if __name__ == '_main_':
     node = SwitchControlNode(node_name='switch_control_node')
     node.run()
