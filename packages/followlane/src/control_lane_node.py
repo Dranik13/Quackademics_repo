@@ -75,10 +75,10 @@ class ControlLaneNode(DTROS):
 
         # --- Kombination der beiden Fehlerarten ---
         # Falls das Fahrzeug nach links zeigen würde (theta > 0), gewichte den Winkel etwas mit
-        if error_theta > 0:
-            error = error_lat + 0.5 * error_theta  # Gewichtung von theta kann angepasst werden
-        else:
-            error = error_lat  # Nur lateral, wenn Winkelfehler negativ oder null
+        # if error_theta == 0:
+        #     error = error_lat + 0.5 * error_theta  # Gewichtung von theta kann angepasst werden
+        # else:
+        error = error_lat + 0.5 * error_theta # Nur lateral, wenn Winkelfehler negativ oder null
         
         #error = (320 - center) / 25
         P = error * self.Kp

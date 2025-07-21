@@ -24,7 +24,7 @@ class SwitchControlNode(DTROS):
         self.sub_lane = rospy.Subscriber(f"/{self._vehicle_name}/detect/lane", Float64, self.cbLaneDetected, queue_size = 1)
         self.sub_parking = rospy.Subscriber(f"/{self._vehicle_name}/detect/parking_active", Bool, self.cbParkingActive, queue_size=1)
         self.pub_control = rospy.Publisher(f"/{self._vehicle_name}/switch/control", Int32, queue_size = 1)
-        #self.sub_Obstacle_enabled = rospy.Subscriber(f"/{self._vehicle_name}/obstacle/enabled", Bool, self.cbObstacleEnabled, queue_size = 1)
+        self.sub_Obstacle_enabled = rospy.Subscriber(f"/{self._vehicle_name}/obstacle/enabled", Bool, self.cbObstacleEnabled, queue_size = 1)
 
         # Topic-Name:
         self._crossing_enabled_topic = f"/{self._vehicle_name}/crossing/enabled"
@@ -44,7 +44,7 @@ class SwitchControlNode(DTROS):
         self.state = ControlType.Lane
         self.obstacle_detected = False
         self.lane_detected = False
-        self.crossing_enabled = False
+        self._crossing_enabled = False
 
         self.pending_direction = None
         self.last_crossing_end_time = rospy.get_time()
@@ -67,32 +67,42 @@ class SwitchControlNode(DTROS):
         self.lane_detected = msg.data > 0
         self.update_state()
 
+    def cbParkingActive(self, msg):
+        self._parking_active = msg.data
+        if msg.data:
+            rospy.loginfo("🔐 Parking-Modus aktiviert.")
+            self.state = ControlType.Parking
+        else:
+            rospy.loginfo("🔓 Parking-Modus deaktiviert.")
+            self.state = ControlType.Lane
+
     def cbCrossingEnabled(self, msg):
-        self.crossing_enabled = msg.data
+        self._crossing_enabled = msg.data
 
         if not msg.data:
             rospy.loginfo("Kreuzung beendet.")
             self.last_crossing_end_time = rospy.get_time()
             self.state = ControlType.Lane
             self.pending_direction = None
+    
     def cbDuckieDetected(self, msg):
         if self._parking_active:
             return
         if msg.data:
-            self._control_mode = ControlType.Obstacle
+            self.state = ControlType.Obstacle
         elif not self._Obstacle_enabled:
-            self._control_mode = ControlType.Lane
+            self.state = ControlType.Lane
 
     def cbLaneDetected(self, msg):
         # Change control Mode if Lane Detected and no Duckie
         if msg.data > 0 and self._Obstacle_enabled == False and self._crossing_enabled == False:
-            self._control_mode = ControlType.Lane
+            self.state = ControlType.Lane
         self.update_state()
 
     def cbDirectionReceived(self, msg):
         # Nur annehmen, wenn wir nicht mitten in einer Kreuzung sind
         now = rospy.get_time()
-        if self.crossing_enabled:
+        if self._crossing_enabled:
             rospy.logwarn("Richtung empfangen, aber Kreuzung läuft bereits.")
             return
 
@@ -143,9 +153,9 @@ class SwitchControlNode(DTROS):
         rate = rospy.Rate(10)
         while not rospy.is_shutdown():
             msg_control = Int32()
-            msg_control.data = self._control_mode.value
+            msg_control.data = self.state.value
             self.pub_control.publish(msg_control)
-            #rospy.loginfo(f"Control mode: {self._control_mode.name} (Value: {msg_control.data})")
+            #rospy.loginfo(f"Control mode: {self.state.name} (Value: {msg_control.data})")
             rate.sleep()
 
 

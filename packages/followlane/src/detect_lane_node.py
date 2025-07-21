@@ -180,8 +180,9 @@ class DetectLaneNode(DTROS):
                 delta_dx = previous_dx - dx
                 delta_dy = previous_dy - dy
 
-                if viewed_pt >= 1 and (abs(delta_dx) > 0.9 or abs(delta_dy) > 0.9):
+                if viewed_pt >= 1 and abs(delta_dx) > 0.9:
                     dx = -dx
+                elif viewed_pt >=1 and abs(delta_dy) > 0.9:
                     dy = -dy
 
                 # check pixelwise
@@ -237,10 +238,12 @@ class DetectLaneNode(DTROS):
                 diff = ((width/2) - pt[0]) * -2.0   # double the difference by adding it one additional time
                 new_x = pt[0] + diff
                 desired_centers[i] = (new_x, pt[1])
+                # if i == len(desired_centers) -1:
+                #     print("DOPPLE LETZTEN PUNKT ", i)
 
         msg_desired_center = Float64()
 
-        if len(desired_centers) >= 2 and desired_centers[len(desired_centers)-1][1] >= 130:
+        if len(desired_centers) >= 2 and desired_centers[len(desired_centers)-1][1] >= 110:
             msg_desired_center.data = float(desired_centers[len(desired_centers)-1][0])
             self.pub_lane.publish(msg_desired_center)
 

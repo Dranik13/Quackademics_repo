@@ -24,19 +24,19 @@ duckie_detect:
   top_right_x: 480
   top_right_y: 250
 white:
-  hh: 255
-  hl: 0
+  hh: 125
+  hl: 50
   sh: 80
   sl: 0
   vh: 255
-  vl: 150
+  vl: 172
 yellow:
-  hh: 80
-  hl: 0
+  hh: 40
+  hl: 15
   sh: 255
-  sl: 0
+  sl: 40
   vh: 255
-  vl: 127
+  vl: 120
 line_detection_params:
   # maximale lücke zwischen Mittel- und Seitenlinie
   max_line_gap: 150
