@@ -8,11 +8,12 @@ import os
 from enum import Enum
 from switch_control_node import ControlType
 
-# class ControlType(Enum):
-#     Lane = 1
-#     Obstacle = 2
-#     Intersection = 3
-#     Parking = 4
+class ControlType(Enum):
+    Lane = 1
+    Obstacle = 2
+    Intersection_Waiting = 3
+    Intersection_Active = 4
+    Parking = 5  # <-- NEU hinzugefügt
 
 class ControlParkingNode(DTROS):
     def __init__(self, node_name):
@@ -33,15 +34,15 @@ class ControlParkingNode(DTROS):
 
 
     def cb_mode(self, msg):
-        if msg.data == ControlType.Parking and not self.parking_routine_started:
+        if (msg.data == ControlType.Parking.value) and (not self.parking_routine_started):
             rospy.loginfo("🅿️ Einparkvorgang aktiviert")
             self.active = True
             self.current_step = 0
             self.step_counter = 0
             self.parking_routine_started = True
-        else:
-            self.parking_routine_started = False
-            self.active = False            
+        # else:
+        #     self.parking_routine_started = False
+        #     self.active = False            
 
     def step_callback(self, event):
         if not self.active:
@@ -94,7 +95,7 @@ class ControlParkingNode(DTROS):
             cmd.v = 0.0
             cmd.omega = 0.0
             self.active = False
-            self.pub_cmd.publish(cmd)
+            #self.pub_cmd.publish(cmd)
             self.pub_parked.publish(Bool(data=True))  # Eingeschert setzen
             rospy.loginfo("✅ Einparkvorgang abgeschlossen.")
 

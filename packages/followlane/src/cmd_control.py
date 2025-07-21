@@ -77,9 +77,7 @@ class SwitchControlNode(DTROS):
             #     msg_cmd = self.cmd_value
             if False:
                 pass
-            elif self.control_mode == 4:
-                msg_cmd = self.cmd_value
-            elif self.control_mode == 3:
+            elif self.control_mode == 3 or self.control_mode == 4 or self.control_mode == 5:
                 msg_cmd = self.cmd_value
             else:
                 msg_cmd = self.cmd_value

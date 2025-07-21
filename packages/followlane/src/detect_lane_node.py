@@ -33,12 +33,14 @@ class DetectLaneNode(DTROS):
         self._vehicle_name = os.environ['VEHICLE_NAME']
         self._camera_topic = f"/{self._vehicle_name}/camera_node/image/compressed"
         self._obstacle_topic = f"/{self._vehicle_name}/obstacle/enabled"
-        self._bb_duckies_topic = f"/{self._vehicle_name}/detect/duckiebot_box"
+        self._bb_duckiebots = f"/{self._vehicle_name}/detect/duckiebot_box"
+        # self._bb_duckies = f"/{self._vehicle_name}/detect/duckie_boxes"
 
         self.sub_obstacle_avoidance = rospy.Subscriber(self._obstacle_topic, Bool, self.checkObstacleAvoidance, queue_size = 1)
         self.sub_image_original = rospy.Subscriber(self._camera_topic, CompressedImage, self.cbFindLane, queue_size = 1)
 
-        self.sub_bb_duckies = rospy.Subscriber(self._bb_duckies_topic, Float64MultiArray, self.cbBBDuckies, queue_size = 1)
+        self.sub_bb_duckiebots = rospy.Subscriber(self._bb_duckiebots, Float64MultiArray, self.cbBBDuckiebots, queue_size = 1)
+        # self.sub_bb_duckies = rospy.Subscriber(self._bb_duckies, Float64MultiArray, self.cbBBDuckies, queue_size = 1)
 
         self.pub_lane = rospy.Publisher(f'/{self._vehicle_name}/detect/lane', Float64, queue_size = 1)
         self.pub_orientation = rospy.Publisher(f'/{self._vehicle_name}/detect/orientation', Float64, queue_size=1)
@@ -54,7 +56,8 @@ class DetectLaneNode(DTROS):
         self.drive_left_timer = 0
         self.drive_left_timer_run = False
 
-        self.bb_duckies = Float64MultiArray()
+        self.bb_duckiebots = Float64MultiArray()
+        # self.bb_duckies = Float64MultiArray()
 
         self.center_history = deque(maxlen=5)
 
@@ -80,8 +83,11 @@ class DetectLaneNode(DTROS):
         #print("msg: ", avoiding_obstacles_msg.data)
         self.avoiding_obstacles = avoiding_obstacles_msg.data
 
-    def cbBBDuckies(self, msg):
-        self.bb_duckies = msg
+    def cbBBDuckiebots(self, msg):
+        self.bb_duckiebots = msg
+
+    # def cbBBDuckies(self, msg):
+    #     self.bb_duckies = msg
 
     def cbFindLane(self, image_msg):
         # 10 HZ -> 0.1 second
@@ -113,15 +119,22 @@ class DetectLaneNode(DTROS):
         #     bottom_right_corner = (result[2], result[3])
         #     cv2.rectangle(cv_image_copy, top_left_corner, bottom_right_corner, -1)
         Black = (0,0,0)
-        if self.bb_duckies is not None and len(self.bb_duckies.data) >=4:
-            top_left_corner = (int(self.bb_duckies.data[0]), int(self.bb_duckies.data[1]))
-            bottom_right_corner = (int(self.bb_duckies.data[2]), int(self.bb_duckies.data[3]))
+
+        if self.bb_duckiebots is not None and len(self.bb_duckiebots.data) >=4:
+            top_left_corner = (int(self.bb_duckiebots.data[0]), int(self.bb_duckiebots.data[1]))
+            bottom_right_corner = (int(self.bb_duckiebots.data[2]), int(self.bb_duckiebots.data[3]))
             cv2.rectangle(cv_image, top_left_corner, bottom_right_corner,Black, -1)
             # cv2.imshow("Rechteck",cv_image_copy)
+
+        # if self.bb_duckies is not None and len(self.bb_duckies.data) >=4:
+        #     top_left_corner = (int(self.bb_duckies.data[0]), int(self.bb_duckies.data[1]))
+        #     bottom_right_corner = (int(self.bb_duckies.data[2]), int(self.bb_duckies.data[3]))
+        #     cv2.rectangle(cv_image, top_left_corner, bottom_right_corner,Black, -1)
 
         bv_img = self.transformToBirdsView(cv_image)
         bv_img = bv_img[self.look_distance:, :]
 
+        original_bv_img = bv_img.copy()
         hsv = cv2.cvtColor(bv_img, cv2.COLOR_BGR2HSV)
     
         # create masks for yellow and white pixels
@@ -267,6 +280,9 @@ class DetectLaneNode(DTROS):
                 diff = ((width/2) - pt[0]) * -1.2   # double the difference by adding it one additional time
                 new_x = pt[0] + diff
                 desired_centers[i] = (new_x, pt[1])
+        
+        if middle_pt_far_enough == True:
+            middle_pt_far_enough = checkForRedLine(original_bv_img)
 
         if middle_pt_far_enough == False:
             hard_centers = []
@@ -576,6 +592,36 @@ def calcMiddlePtOfContours(contour):
         return cx, cy
 
     return None, None
+
+def checkForRedLine(img):
+    height, width = img.shape[:2]
+    bottom_segment = img[int(height*0.60):, :]
+    
+    # In HSV umwandeln
+    hsv_bottom = cv2.cvtColor(bottom_segment, cv2.COLOR_BGR2HSV)
+    
+    # Rot-Maske (zwei Bereiche wegen HSV-Umbruch)
+    lower_red1 = np.array([0, 100, 100])
+    upper_red1 = np.array([10, 255, 255])
+    lower_red2 = np.array([160, 100, 100])
+    upper_red2 = np.array([179, 255, 255])
+
+    mask_red1 = cv2.inRange(hsv_bottom, lower_red1, upper_red1)
+    mask_red2 = cv2.inRange(hsv_bottom, lower_red2, upper_red2)
+    mask_red = cv2.bitwise_or(mask_red1, mask_red2)
+
+    # Bild mit roten Pixeln anzeigen
+    cv2.imshow("Red Mask", mask_red)
+    cv2.waitKey(1)
+
+    red_pixel_count = cv2.countNonZero(mask_red)
+    red_pixel_threshold = 150
+
+    if red_pixel_count >= red_pixel_threshold:
+        print("LINIE ERKANNT!!!")
+        return True
+    else:
+        return False
 
 if __name__ == '__main__':
 
