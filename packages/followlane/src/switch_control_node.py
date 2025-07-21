@@ -45,6 +45,7 @@ class SwitchControlNode(DTROS):
         self.obstacle_detected = False
         self.lane_detected = False
         self._crossing_enabled = False
+        self._Obstacle_enabled = False
 
         self.pending_direction = None
         self.last_crossing_end_time = rospy.get_time()
@@ -71,10 +72,10 @@ class SwitchControlNode(DTROS):
         self._parking_active = msg.data
         if msg.data:
             rospy.loginfo("🔐 Parking-Modus aktiviert.")
-            self.state = ControlType.Parking
+            # self.state = ControlType.Parking
         else:
             rospy.loginfo("🔓 Parking-Modus deaktiviert.")
-            self.state = ControlType.Lane
+            # self.state = ControlType.Lane
 
     def cbCrossingEnabled(self, msg):
         self._crossing_enabled = msg.data
@@ -111,6 +112,8 @@ class SwitchControlNode(DTROS):
             return
 
         self.pending_direction = msg.data
+        # self.pending_direction = 0b1001
+        
         rospy.loginfo(f"Neue Richtung empfangen: {self.pending_direction}")
         self.state = ControlType.Intersection_Waiting
         self.update_state()
