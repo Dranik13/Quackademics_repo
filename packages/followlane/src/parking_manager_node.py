@@ -108,10 +108,10 @@ class ParkingManagerNode(DTROS):
             self.parking_timer_started = True
             self.timer = rospy.Timer(rospy.Duration(0.1), self.cb_parking_timer)
             self.timer_count = 0
-        elif not msg.data:
-            rospy.loginfo("🅿️ Parkplatz freigegeben – bereit für neuen Vorgang")
-            self.parking_started = False
-            self.parking_timer_started = False    
+        # elif not msg.data:
+        #     rospy.loginfo("🅿️ Parkplatz freigegeben – bereit für neuen Vorgang")
+        #     self.parking_started = False
+        #     self.parking_timer_started = False    
 
     def cb_parking_timer(self, event):
         self.timer_count += 1
@@ -132,8 +132,8 @@ class ParkingManagerNode(DTROS):
     def _reset_after_unparking(self, event):
         self.parking_started = False
         self.parking_timer_started = False
-        self.parking_spot_detected = False
-        self.spot_detected_time = None
+        #self.parking_spot_detected = False
+        #self.spot_detected_time = None
         self.pub_unpark.publish(Bool(data=False))
 
 

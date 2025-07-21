@@ -39,9 +39,17 @@ class ControlParkingNode(DTROS):
             self.current_step = 0
             self.step_counter = 0
             self.parking_routine_started = True
-        else:
-            self.parking_routine_started = False
-            self.active = False            
+        # else:
+        #     self.parking_routine_started = False
+        #     self.active = False            
+    
+    # Starte ausparkvorgang        
+    def cb_unpark(self, msg):
+        if msg.data:
+            rospy.loginfo("⬅️ Starte Ausparkvorgang")
+            self.current_step = 100  # Neue Schrittfolge fürs Ausparken
+            self.step_counter = 0
+            self.active = True
 
     def step_callback(self, event):
         if not self.active:
@@ -94,7 +102,7 @@ class ControlParkingNode(DTROS):
             cmd.v = 0.0
             cmd.omega = 0.0
             self.active = False
-            self.pub_cmd.publish(cmd)
+            #self.pub_cmd.publish(cmd)
             self.pub_parked.publish(Bool(data=True))  # Eingeschert setzen
             rospy.loginfo("✅ Einparkvorgang abgeschlossen.")
 
@@ -131,12 +139,7 @@ class ControlParkingNode(DTROS):
 
         self.pub_cmd.publish(cmd)
 
-    def cb_unpark(self, msg):
-        if msg.data:
-            rospy.loginfo("⬅️ Starte Ausparkvorgang")
-            self.current_step = 100  # Neue Schrittfolge fürs Ausparken
-            self.step_counter = 0
-            self.active = True
+
 
 
 

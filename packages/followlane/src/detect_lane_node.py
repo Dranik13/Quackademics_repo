@@ -499,6 +499,8 @@ class DetectLaneNode(DTROS):
             cv2.imshow("mask white", mask_white)
         if self.show_mask_yellow:
             cv2.imshow("mask yellow", mask_yellow)
+        if self.show_input_img:
+            cv2.imshow("input image", cv_image)
         cv2.waitKey(1)
 
     def interpolate_points(self, points, num_points=15):
