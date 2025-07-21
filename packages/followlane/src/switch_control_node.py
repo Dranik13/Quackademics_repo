@@ -14,8 +14,8 @@ class ControlType(Enum):
     Parking = 5  # <-- NEU hinzugefügt
 
 class SwitchControlNode(DTROS):
-    def _init_(self, node_name):
-        super(SwitchControlNode, self)._init_(node_name=node_name, node_type=NodeType.GENERIC)
+    def __init__(self, node_name):
+        super(SwitchControlNode, self).__init__(node_name=node_name, node_type=NodeType.GENERIC)
 
         self._vehicle_name = os.environ['VEHICLE_NAME']
 
@@ -76,10 +76,10 @@ class SwitchControlNode(DTROS):
     def cbParkingActive(self, msg):
         self._parking_active = msg.data
         if msg.data:
-            rospy.loginfo("🔐 Parking-Modus aktiviert.")
+            rospy.loginfo("Parking-Modus aktiviert.")
             self.state = ControlType.Parking
         else:
-            rospy.loginfo("🔓 Parking-Modus deaktiviert.")
+            rospy.loginfo("Parking-Modus deaktiviert.")
             self.state = ControlType.Lane
         self.update_state()
 
@@ -104,7 +104,7 @@ class SwitchControlNode(DTROS):
         # Höchste Priorität: Parking-Modus
         if self._parking_active:
             if self.state != ControlType.Parking:
-                rospy.loginfo("Parking aktiviert – Wechsel in Parking-Modus.")
+                rospy.loginfo("Parking aktiviert Wechsel in Parking-Modus.")
             self.state = ControlType.Parking
             return
 
@@ -143,9 +143,11 @@ class SwitchControlNode(DTROS):
             msg_control = Int32()
             msg_control.data = self.state.value
             self.pub_control.publish(msg_control)
+            # print("msg_control: ", msg_control.data)
             rate.sleep()
 
 
-if __name__ == '_main_':
+if __name__ == '__main__':
     node = SwitchControlNode(node_name='switch_control_node')
     node.run()
+    rospy.spin()

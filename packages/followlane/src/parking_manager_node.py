@@ -104,10 +104,11 @@ class ParkingManagerNode(DTROS):
 
     def cb_parked_status(self, msg):
         if msg.data and not self.parking_timer_started:
-            rospy.loginfo("⏳ Eingeschert – starte Parkdauer-Timer")
+            rospy.loginfo(" Eingeschert starte Parkdauer-Timer")
             self.parking_timer_started = True
             self.timer = rospy.Timer(rospy.Duration(0.1), self.cb_parking_timer)
             self.timer_count = 0
+
         # elif not msg.data:
         #     rospy.loginfo("🅿️ Parkplatz freigegeben – bereit für neuen Vorgang")
         #     self.parking_started = False
@@ -124,7 +125,7 @@ class ParkingManagerNode(DTROS):
     
     def cb_unparked(self, msg):
         if msg.data:
-            rospy.loginfo("✅ Ausparkvorgang abgeschlossen – zurück zu Spurfolge.")
+            # rospy.loginfo("✅ Ausparkvorgang abgeschlossen – zurück zu Spurfolge.")
             self.pub_parking_active.publish(Bool(data=False))  # Triggert Rückschaltung auf Lane
              # Starte Verzögerungstimer (z. B. 1 Sekunde)
             rospy.Timer(rospy.Duration(2.0), self._reset_after_unparking, oneshot=True)
