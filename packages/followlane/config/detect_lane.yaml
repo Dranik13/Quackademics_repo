@@ -57,8 +57,8 @@ search_for_parking_lot:
   max_y_diff: 70
 debugging_output:
   line_coordinates: false
-  input_image: false
-  output_image: true
+  input_image: True
+  output_image: false
   mask_white: false
   mask_yellow: false
 controller:
