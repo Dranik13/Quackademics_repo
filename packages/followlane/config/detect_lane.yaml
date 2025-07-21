@@ -39,7 +39,7 @@ yellow:
   vl: 100
 line_detection_params:
   # maximale lücke zwischen Mittel- und Seitenlinie
-  max_line_gap: 200
+  max_line_gap: 150
   # alle Pixel deren y-Wert unter diesem Wert liegt werden nicht betrachtet (Parameter funktioniert irgendwie nicht richtig -> im Code erste Zeile in cvFindlane())
   look_distance: 100
   # Bildbreite um Bildmitte in der nach der Mittellinie gesucht wird
@@ -58,7 +58,7 @@ search_for_parking_lot:
 debugging_output:
   line_coordinates: false
   input_image: false
-  output_image: false
+  output_image: true
   mask_white: false
   mask_yellow: false
 controller:
