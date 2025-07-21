@@ -250,16 +250,17 @@ class DetectDuckieBot(DTROS):
                     
         cv2.polylines(image, [self.static_roi_polygon.astype(np.int32).reshape((-1, 1, 2))], isClosed=True, color=(0, 0, 255), thickness=2)
         # Bild publishen
-        if self.conf['debugging_output']['input_image'] or True:
+        if self.conf['debugging_output']['input_image'] :
             ros_img = self.bridge.cv2_to_imgmsg(image, encoding="bgr8")
             self.pub_image.publish(ros_img)
         self.pub_duckie_box.publish(self.boxes_msg)
         self.pub_parking_free.publish(Bool(data=not self.occupied_parkingspot))
         if self.occupied_parkingspot:
             rospy.loginfo("Parkplatz Belegt")
-
+    
+        cv2.imshow("Detected Duckiebot", image)
+        cv2.waitKey(1)
         
-
     def timer_callback(self, event):
         image = None
         with self.image_lock:
@@ -270,12 +271,8 @@ class DetectDuckieBot(DTROS):
             results = self._model(image, verbose=False)
             self.draw_boxes(results, image)
             
-
-        
-
     def run(self):
         rospy.spin()
-
 
 if __name__ == "__main__":
     node = DetectDuckieBot(node_name="detect_duckie_node_parking")
