@@ -209,7 +209,7 @@ class DetectDuckieBot(DTROS):
                 pt2_right = (self.pt2_img[0] + roi_width, self.pt2_img[1])
 
                 self.roi_polygon = np.array([self.pt1_img, self.pt2_img, pt2_right, pt1_right])
-                if self.conf['debugging_output']['input_image']:
+                if self.conf['debugging_output']['inpumask_duckiebott_image']:
                     cv2.polylines(image, [self.roi_polygon.astype(np.int32).reshape((-1, 1, 2))], isClosed=True, color=(255, 0, 0), thickness=2)
 
             
@@ -230,10 +230,10 @@ class DetectDuckieBot(DTROS):
                     # Prüfe auf Überschneidung
                     if self.bbox_overlaps_roi([x1, y1, x2, y2], self.roi_polygon):
                         self.occupied_parkingspot = True
-                        if self.conf['debugging_output']['input_image']:
+                        if self.conf['debugging_output']['mask_duckiebot']:
                             cv2.putText(image, "OVERLAP", (x1, y2 + 15),
                                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-                if self.conf['debugging_output']['input_image']:
+                if self.conf['debugging_output']['mask_duckiebot']:
                     # Bounding Box zeichnen
                     cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
                     cv2.putText(image, label, (x1, y1 - 5),
@@ -244,13 +244,19 @@ class DetectDuckieBot(DTROS):
             for x1, y1, x2, y2 in self.duckie_boxes:
                 if self.bbox_overlaps_roi([x1, y1, x2, y2], self.roi_polygon):
                     self.occupied_parkingspot = True
-                    if self.conf['debugging_output']['input_image']: 
+                    if self.conf['debugging_output']['mask_duckiebot']: 
                         cv2.putText(image, "OVERLAP", (x1, y2 + 15),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+                        
+                # Bounding Box zeichnen
+                if self.conf['debugging_output']['mask_duckiebot']:
+                    cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                    cv2.putText(image, "Duckie", (x1, y1 - 5),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                     
         cv2.polylines(image, [self.static_roi_polygon.astype(np.int32).reshape((-1, 1, 2))], isClosed=True, color=(0, 0, 255), thickness=2)
         # Bild publishen
-        if self.conf['debugging_output']['input_image'] :
+        if self.conf['debugging_output']['mask_duckiebot'] :
             ros_img = self.bridge.cv2_to_imgmsg(image, encoding="bgr8")
             self.pub_image.publish(ros_img)
         self.pub_duckie_box.publish(self.boxes_msg)

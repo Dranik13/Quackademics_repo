@@ -45,6 +45,8 @@ class DetectLaneNode(DTROS):
         
         self.pub_parking_spot = rospy.Publisher(f'/{self._vehicle_name}/detect/parking_spot', Bool, queue_size=1)
         self.pub_parking_debug = rospy.Publisher(f"/{self._vehicle_name}/debug/parking_img", Image, queue_size=1)
+        self.pub_parking_roi_px = rospy.Publisher(f"/{self._vehicle_name}/detect/parking_roi_px", Float64MultiArray, queue_size=1)
+
 
 
         self._bridge = CvBridge()

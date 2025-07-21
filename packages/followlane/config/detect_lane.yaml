@@ -61,6 +61,7 @@ debugging_output:
   output_image: false
   mask_white: false
   mask_yellow: false
+  mask_duckiebot: false
 controller:
   max_speed: 0.2
   min_speed_percent: 0.4
