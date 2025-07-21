@@ -158,7 +158,7 @@ class DetectLaneNode(DTROS):
         #         filtered_yellow_contours.append(contour)
 
         white_contours = []
-
+        middle_pt_far_enough = False
         # calculate middle_pts of line segments
         middle_pts = []
         mask_x_center = mask_yellow.shape[1] // 2
@@ -173,10 +173,13 @@ class DetectLaneNode(DTROS):
                 if dist > 120:
                     continue
             # accept middlepoint of line segment if it is within self.middle_line_look_width                                 cy nicht vergessen!!!!!!!!!!!!!!!!
-            if cx >= mask_x_center - self.middle_line_look_width/2 and cx <= mask_x_center + self.middle_line_look_width and cy > 70:
+            if cx >= mask_x_center - self.middle_line_look_width/2 and cx <= mask_x_center + self.middle_line_look_width and cy > 90:
                 middle_pts.append((cx,cy))
                 cv2.circle(bv_img, (cx, cy), 5, (0, 0, 255), -1)
                 
+                if cy < 190 and middle_pt_far_enough == False:
+                    middle_pt_far_enough = True
+
                 if len(middle_pts) == self.num_middle_pts:
                     break
         
@@ -218,6 +221,9 @@ class DetectLaneNode(DTROS):
                         sideline_pts.append((int(new_x), int(new_y)))
                         midpoint = (int((new_x + middle_pts[viewed_pt][0]) / 2.0), int((new_y + middle_pts[viewed_pt][1]) / 2.0))
                         desired_centers.append(midpoint)
+                        middle_pt_far_enough = True
+                        # if midpoint[1] < 190 and middle_pt_far_enough == False:
+                        #     middle_pt_far_enough = True
 
                         if self.show_output_img:
                             cv2.circle(bv_img, (int(new_x), int(new_y)), 5, (0, 255, 0), -1)
@@ -241,6 +247,7 @@ class DetectLaneNode(DTROS):
         else:
             white_contours, _ = cv2.findContours(mask_white, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             if white_contours:
+                middle_pt_far_enough = True
                 # find lowest contur (highest y-Wert)
                 lowest_contour = max(white_contours, key=lambda c: cv2.boundingRect(c)[1] + cv2.boundingRect(c)[3])
                 cx, cy = calcMiddlePtOfContours(lowest_contour)
@@ -257,11 +264,14 @@ class DetectLaneNode(DTROS):
         # set the absolute x-value of close points higher for faster reaction
         for i, pt in enumerate(desired_centers):
             if pt[0] > 150:
-                diff = ((width/2) - pt[0]) * -2.0   # double the difference by adding it one additional time
+                diff = ((width/2) - pt[0]) * -1.2   # double the difference by adding it one additional time
                 new_x = pt[0] + diff
                 desired_centers[i] = (new_x, pt[1])
-                # if i == len(desired_centers) -1:
-                #     print("DOPPLE LETZTEN PUNKT ", i)
+
+        if middle_pt_far_enough == False:
+            hard_centers = []
+            hard_centers.append((650, 250))
+            desired_centers = hard_centers
 
         msg_desired_center = Float64()
 
