@@ -7,7 +7,7 @@ import os
 from duckietown.dtros import DTROS, NodeType
 from sensor_msgs.msg import CompressedImage, Image
 from ultralytics import YOLO
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool,Float64MultiArray
 from cv_bridge import CvBridge
 import yaml
 from threading import Lock
@@ -30,6 +30,8 @@ class DetectDuckieNode(DTROS):
         # publish duckie
         self._duckie_topic = f"/{self._vehicle_name}/detect/duckie"
         self.pup_duckie = rospy.Publisher(self._duckie_topic, Bool, queue_size = 1)
+        self.pub_duckie_boxes = rospy.Publisher(f"/{self._vehicle_name}/detect/duckie_boxes", Float64MultiArray, queue_size=1)
+
 
         self.pts1 = np.float32([
             [self.conf['duckie_detect']['top_left_x'],     self.conf['duckie_detect']['top_left_y']],
@@ -38,6 +40,7 @@ class DetectDuckieNode(DTROS):
             [self.conf['duckie_detect']['bottom_left_x'],  self.conf['duckie_detect']['bottom_left_y']],])
 
         self.counter = 0
+        self.boxes_msg = Float64MultiArray()
 
         self.last_frame = False
         self.image_lock = Lock()
@@ -79,6 +82,7 @@ class DetectDuckieNode(DTROS):
             for box in result.boxes:
                 x1, y1 = int(box.xyxy[0][0]), int(box.xyxy[0][1])
                 x2, y2 = int(box.xyxy[0][2]), int(box.xyxy[0][3])
+                self.boxes_msg.data.extend([x1, y1, x2, y2])
 
                 # Mittelpunkt der Bounding Box berechnen
                 center_x = int((x1 + x2) / 2)
@@ -97,6 +101,8 @@ class DetectDuckieNode(DTROS):
             msg_detected = False
         self.last_frame = object_in_path
         self.pup_duckie.publish(msg_detected)
+            # BoundingBoxen publishen
+        self.pub_duckie_boxes.publish(self.boxes_msg) 
 
     def draw_bounding_boxes(self, results, img):
         #print("results: ", len(results[0].boxes))
