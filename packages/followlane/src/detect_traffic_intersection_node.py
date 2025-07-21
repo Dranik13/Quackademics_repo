@@ -65,7 +65,7 @@ class CrossingIntersectionNode(DTROS):
         cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
         # Richtung ermitteln und Debug-Bild generieren
-        flags, debug_img = self.compute_possible_directions(cv_image, distance=0.8)
+        flags, debug_img = self.compute_possible_directions(cv_image, distance=0.9)
         flags_bin = sum(bit for key, bit in self.DIRECTIONS.items() if flags.get(key, False))
 
         # Flag für Stop erkennen ermitteln
@@ -162,7 +162,7 @@ class CrossingIntersectionNode(DTROS):
         mask[:roi_start, :] = 0
 
         contours_all, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        filtered = [c for c in contours_all if cv2.contourArea(c) >= 100]
+        filtered = [c for c in contours_all if cv2.contourArea(c) >= 500]
         contours = sorted(filtered, key=cv2.contourArea, reverse=True)[:4]
 
         image_copy = image.copy()

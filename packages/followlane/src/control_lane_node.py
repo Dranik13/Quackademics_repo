@@ -23,7 +23,7 @@ class ControlLaneNode(DTROS):
         self.desired_theta = 0.0
         self.sub_orientation = rospy.Subscriber(f"/{self._vehicle_name}/detect/orientation", Float64, self.cbOrientation, queue_size=1)
         
-        self.Kp = 5.0     # P Anteil meist 2.0 - 4.0
+        self.Kp = 3.0     # P Anteil meist 2.0 - 4.0
         self.Ki = 0.0     # I Anteil meist 0.0 - 0.5
         self.Kd = 0.0     # D Anteil meist 0.1 - 1.0
         # self.dt = 0.1   # Zeitintervall
@@ -75,10 +75,10 @@ class ControlLaneNode(DTROS):
 
         # --- Kombination der beiden Fehlerarten ---
         # Falls das Fahrzeug nach links zeigen würde (theta > 0), gewichte den Winkel etwas mit
-        if error_theta > 0:
-            error = error_lat + 0.5 * error_theta  # Gewichtung von theta kann angepasst werden
-        else:
-            error = error_lat  # Nur lateral, wenn Winkelfehler negativ oder null
+        # if error_theta == 0:
+        #     error = error_lat + 0.5 * error_theta  # Gewichtung von theta kann angepasst werden
+        # else:
+        error = error_lat + 0.5 * error_theta # Nur lateral, wenn Winkelfehler negativ oder null
         
         #error = (320 - center) / 25
         P = error * self.Kp
