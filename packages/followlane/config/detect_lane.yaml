@@ -65,3 +65,5 @@ controller:
   max_speed: 0.2
   min_speed_percent: 0.4
   max_steering_angle: 5
+challenge:
+  number: 1

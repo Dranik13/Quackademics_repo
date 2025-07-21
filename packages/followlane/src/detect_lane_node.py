@@ -7,7 +7,7 @@ import rospy
 import numpy as np
 import cv2
 import time
-from std_msgs.msg import Float64, Bool
+from std_msgs.msg import Float64, Bool, Float64MultiArray
 from sensor_msgs.msg import CompressedImage, Image
 from enum import Enum
 import yaml
@@ -33,9 +33,12 @@ class DetectLaneNode(DTROS):
         self._vehicle_name = os.environ['VEHICLE_NAME']
         self._camera_topic = f"/{self._vehicle_name}/camera_node/image/compressed"
         self._obstacle_topic = f"/{self._vehicle_name}/obstacle/enabled"
+        self._bb_duckies_topic = f"/{self._vehicle_name}/detect/duckiebot_box"
 
         self.sub_obstacle_avoidance = rospy.Subscriber(self._obstacle_topic, Bool, self.checkObstacleAvoidance, queue_size = 1)
         self.sub_image_original = rospy.Subscriber(self._camera_topic, CompressedImage, self.cbFindLane, queue_size = 1)
+
+        self.sub_bb_duckies = rospy.Subscriber(self._bb_duckies_topic, Float64MultiArray, self.cbBBDuckies, queue_size = 1)
 
         self.pub_lane = rospy.Publisher(f'/{self._vehicle_name}/detect/lane', Float64, queue_size = 1)
         self.pub_orientation = rospy.Publisher(f'/{self._vehicle_name}/detect/orientation', Float64, queue_size=1)
@@ -50,6 +53,8 @@ class DetectLaneNode(DTROS):
         self.drive_left = False
         self.drive_left_timer = 0
         self.drive_left_timer_run = False
+
+        self.bb_duckies = Float64MultiArray()
 
         self.center_history = deque(maxlen=5)
 
@@ -75,6 +80,8 @@ class DetectLaneNode(DTROS):
         #print("msg: ", avoiding_obstacles_msg.data)
         self.avoiding_obstacles = avoiding_obstacles_msg.data
 
+    def cbBBDuckies(self, msg):
+        self.bb_duckies = msg
 
     def cbFindLane(self, image_msg):
         # 10 HZ -> 0.1 second
@@ -97,6 +104,21 @@ class DetectLaneNode(DTROS):
 
         np_arr = np.frombuffer(image_msg.data, np.uint8)
         cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        # cv_image_copy = cv_image.copy()
+        
+        # Bounding Box ausschneiden
+        # if self.bb_duckies is not None:
+        # for result in self.bb_duckies:
+        #     top_left_corner = (result[0], result[1])
+        #     bottom_right_corner = (result[2], result[3])
+        #     cv2.rectangle(cv_image_copy, top_left_corner, bottom_right_corner, -1)
+        Black = (0,0,0)
+        if self.bb_duckies is not None and len(self.bb_duckies.data) >=4:
+            top_left_corner = (int(self.bb_duckies.data[0]), int(self.bb_duckies.data[1]))
+            bottom_right_corner = (int(self.bb_duckies.data[2]), int(self.bb_duckies.data[3]))
+            cv2.rectangle(cv_image, top_left_corner, bottom_right_corner,Black, -1)
+            # cv2.imshow("Rechteck",cv_image_copy)
+
         bv_img = self.transformToBirdsView(cv_image)
         bv_img = bv_img[self.look_distance:, :]
 
@@ -348,7 +370,8 @@ class DetectLaneNode(DTROS):
         #         msg_desired_center = Float64()
         #         msg_desired_center.data = float(desired_centers[-1][0])
         #         self.pub_lane.publish(msg_desired_center)
-
+        #
+########################################### Interpolation END ######################################################################
 
 
 
