@@ -7,7 +7,7 @@ import rospy
 import numpy as np
 import cv2
 import time
-from std_msgs.msg import Float64, Bool, Float64MultiArray
+from std_msgs.msg import Float64, Bool,Float64MultiArray
 from sensor_msgs.msg import CompressedImage, Image
 from enum import Enum
 import yaml
@@ -48,13 +48,15 @@ class DetectLaneNode(DTROS):
         self.pub_parking_spot = rospy.Publisher(f'/{self._vehicle_name}/detect/parking_spot', Bool, queue_size=1)
         self.pub_parking_debug = rospy.Publisher(f"/{self._vehicle_name}/debug/parking_img", Image, queue_size=1)
 
+
         self._bridge = CvBridge()
-        self.parking_buffer = deque(maxlen=10)  # Puffer für letzte 10 Ergebnisse
+        self.parking_buffer = deque(maxlen=4)  # Puffer für letzte 10 Ergebnisse
         self.counter = 0
         self.avoiding_obstacles = False
         self.drive_left = False
         self.drive_left_timer = 0
         self.drive_left_timer_run = False
+        self.roi_line_msg = Float64MultiArray()
 
         self.bb_duckiebots = Float64MultiArray()
         # self.bb_duckies = Float64MultiArray()
@@ -133,6 +135,7 @@ class DetectLaneNode(DTROS):
 
         bv_img = self.transformToBirdsView(cv_image)
         bv_img = bv_img[self.look_distance:, :]
+        
 
         original_bv_img = bv_img.copy()
         hsv = cv2.cvtColor(bv_img, cv2.COLOR_BGR2HSV)
@@ -408,20 +411,27 @@ class DetectLaneNode(DTROS):
             if not white_contours and len(white_contours) <= 0:
                 white_contours, _ = cv2.findContours(mask_white, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                 
-            x_search_coordinate = sideline_pts[len(sideline_pts)//2][0]   
+            x_search_coordinate = sideline_pts[len(sideline_pts)//2][0]
+              
             # search for rectangle-like contours in the white mask
             for contour in white_contours:
                 area = cv2.contourArea(contour)
-                if area < 200 or area > 800:
+                if area < 150 or area > 600:
                     continue
 
                 x, y, w, h = cv2.boundingRect(contour)
                 aspect_ratio = float(w) / h if h != 0 else 0
+                # Debugging Search Range
+                # cv2.line(bv_img, (x_search_coordinate - self.search_range, 0), 
+                #          (x_search_coordinate - self.search_range, bv_img.shape[0]), (0, 255, 0), 2)
+                # cv2.line(bv_img, (x_search_coordinate + self.search_range, 0), 
+                #          (x_search_coordinate + self.search_range, bv_img.shape[0]), (0, 255, 0), 2)
 
-                if 0.4 < aspect_ratio < 2.0 and 20 < w < 60 and 20 < h < 60:
+                if 0.6 < aspect_ratio < 1.5 and 10 < w < 28 and 10 < h < 28:
                     if x_search_coordinate - self.search_range <= x <= x_search_coordinate + self.search_range:
                         cv2.rectangle(bv_img, (x, y), (x+w, y+h), (0, 255, 255), 2)
-                        cv2.putText(bv_img, f"{int(area)}", (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 255), 1)
+                        info_text = f"w:{w}, h:{h}, ar:{aspect_ratio:.2f}, area:{area}"
+                        cv2.putText(bv_img, info_text, (x, y - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 255), 1)
 
                         potential_parking_lot_marks.append(contour)
             
@@ -442,13 +452,23 @@ class DetectLaneNode(DTROS):
                 # sort list if it isn't sorted already
                 #centers_sorted = sorted(centers, key=lambda pt: pt[1])
 
-                for i in range(1, len(centers)):
-                    y_prev = centers[i-1][1]
-                    y_curr = centers[i][1]
-                    #rospy.loginfo(f"[i={i}] y_prev={y_prev}, y_curr={y_curr}, diff={abs(y_curr - y_prev)}")
-
-                    if abs(y_curr - y_prev) <= self.max_y_diff:
+                for i in range(len(centers)):
+                    if i == 0:
+                        # Ersten Punkt direkt übernehmen
                         parking_lot_marks.append(potential_parking_lot_marks[i])
+                    else:
+                        x_prev, y_prev = centers[i-1]
+                        x_curr, y_curr = centers[i]
+                        diff_y = abs(y_curr - y_prev)
+
+                        # Debug-Text in ROT direkt neben dem zweiten Punkt
+                        if self.show_output_img:
+                            diff_text = f"Δy: {diff_y}"
+                            cv2.putText(bv_img, diff_text, (x_curr + 5, y_curr - 5),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1)
+
+                        if diff_y <= self.max_y_diff:
+                            parking_lot_marks.append(potential_parking_lot_marks[i])
 
             # nearby_parking = False
             # if parking_lot_marks:
@@ -468,16 +488,49 @@ class DetectLaneNode(DTROS):
          
             
             found_parking = len(parking_lot_marks) >= self.min_nr_line_segments
+            if found_parking and parking_lot_marks:
+                centers = []
+                for contour in parking_lot_marks:
+                    cx, cy = calcMiddlePtOfContours(contour)
+                    if cx is not None and cy is not None:
+                        centers.append((cx, cy))
+
+                if len(centers) >= 2:
+                    # Fit a line: y = m*x + b
+                    x_vals = [pt[0] for pt in centers]
+                    y_vals = [pt[1] for pt in centers]
+                    m, b = np.polyfit(x_vals, y_vals, 1)
+                      # Grenzen der X-Achse im Bild (links/rechts)
+                    x_start = x_vals[0]  # Startpunkt der Linie
+                    x_end = x_vals[-1]  # Endpunkt der Linie    
+
+                    # Berechne zugehörige Y-Werte
+                    y_start = int(m * x_start + b)
+                    y_end = int(m * x_end + b)
+
+                    # Begrenze auf gültigen Bildbereich
+                    y_start = max(0, min(bv_img.shape[0] - 1, y_start))
+                    y_end = max(0, min(bv_img.shape[0] - 1, y_end))
+
+                    # Zeichne die Gerade in Lila
+                    if self.show_output_img:
+                        cv2.line(bv_img, (x_start, y_start), (x_end, y_end), (255, 0, 255), 2)  # Lila Linie
+
+                    # Publish ROI Punkt
+                    # self.roi_msg.data = [x_roi, y_roi]
+                    # self.pub_parking_roi_px.publish(self.roi_msg)
+                    self.roi_line_msg.data = [float(x_start), float(y_start), float(x_end), float(y_end)]
+                    self.pub_parking_roi_px.publish(self.roi_line_msg)
             
             # if found_parking:
             #     rospy.loginfo("✅ Parkplatz erkannt!")
             # # # Puffer aktualisieren
-            # self.parking_buffer.append(found_parking)
+            self.parking_buffer.append(found_parking)
 
-            # # Stabilitäts-Entscheidung: mind. 7 von 10
-            # stable_parking = sum(self.parking_buffer) >= 7
+            # Stabilitäts-Entscheidung: mind. 7 von 10
+            stable_parking = sum(self.parking_buffer) >= 3
             
-            self.pub_parking_spot.publish(Bool(data=found_parking))
+            self.pub_parking_spot.publish(Bool(data=stable_parking))
             #rospy.loginfo_throttle(1, f"Publishing parking: {found_parking}")
             #rospy.loginfo_throttle(1, f"Parkplatz-Erkennung: potenziell={len(potential_parking_lot_marks)}, akzeptiert={len(parking_lot_marks)}")
 
@@ -490,12 +543,13 @@ class DetectLaneNode(DTROS):
                 #cv2.line(bv_img, (x_search_coordinate + 50, 0), (x_search_coordinate + 50, bv_img.shape[0]), (255, 255, 0), 1)
 
         if self.show_output_img:
-            # cv2.drawContours(bv_img, filtered_yellow_contours, -1, (0, 255, 255), 2)  # Gelb, Dicke 2
             cv2.imshow("line detection", bv_img)
         if self.show_mask_white:
             cv2.imshow("mask white", mask_white)
         if self.show_mask_yellow:
             cv2.imshow("mask yellow", mask_yellow)
+        if self.show_input_img:
+            cv2.imshow("input image", cv_image)
         cv2.waitKey(1)
 
     def interpolate_points(self, points, num_points=15):

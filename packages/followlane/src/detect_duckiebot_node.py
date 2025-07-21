@@ -53,10 +53,10 @@ class DetectDuckieBot(DTROS):
 
         # Fahrbereich
         self.static_roi_polygon = np.array([
-                (250, 380),
-                (390, 380),
-                (390, 460),
-                (250, 460)
+                (0, 480),
+                (640, 480),
+                (540, 400),
+                (100, 400)
             ])
         # Transformation Matrix für Birdview
         self.H_birdview = np.array([
@@ -83,6 +83,7 @@ class DetectDuckieBot(DTROS):
 
     def cb_parking_spot(self, msg):
         self.parking_spot_detected = msg.data
+
     def cb_duckie_boxes(self, msg):
         self.duckie_boxes = []
         data = msg.data
@@ -246,9 +247,10 @@ class DetectDuckieBot(DTROS):
                     if self.conf['debugging_output']['input_image']: 
                         cv2.putText(image, "OVERLAP", (x1, y2 + 15),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-
+                    
+        cv2.polylines(image, [self.static_roi_polygon.astype(np.int32).reshape((-1, 1, 2))], isClosed=True, color=(0, 0, 255), thickness=2)
         # Bild publishen
-        if self.conf['debugging_output']['input_image']:
+        if self.conf['debugging_output']['input_image'] or True:
             ros_img = self.bridge.cv2_to_imgmsg(image, encoding="bgr8")
             self.pub_image.publish(ros_img)
         self.pub_duckie_box.publish(self.boxes_msg)
@@ -256,7 +258,7 @@ class DetectDuckieBot(DTROS):
         if self.occupied_parkingspot:
             rospy.loginfo("Parkplatz Belegt")
 
-        # cv2.imshow("", image)
+        
 
     def timer_callback(self, event):
         image = None
