@@ -672,7 +672,7 @@ def checkForRedLine(img):
     red_pixel_threshold = 150
 
     if red_pixel_count >= red_pixel_threshold:
-        print("LINIE ERKANNT!!!")
+        # print("LINIE ERKANNT!!!")
         return True
     else:
         return False
