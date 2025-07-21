@@ -92,7 +92,6 @@ class ControlLaneNode(DTROS):
         
         a = P + I + D
         v = 0.2
-        #print("CL: v: ", v, "omega: ", a)
         self.twist = Twist2DStamped(v=v, omega=a)
         #twist = Twist2DStamped(v=v, omega=a)
 
