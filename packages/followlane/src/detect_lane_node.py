@@ -33,9 +33,12 @@ class DetectLaneNode(DTROS):
         self._vehicle_name = os.environ['VEHICLE_NAME']
         self._camera_topic = f"/{self._vehicle_name}/camera_node/image/compressed"
         self._obstacle_topic = f"/{self._vehicle_name}/obstacle/enabled"
+        self._bb_duckies_topic = f"/{self._vehicle_name}/detect/duckiebot_box"
 
         self.sub_obstacle_avoidance = rospy.Subscriber(self._obstacle_topic, Bool, self.checkObstacleAvoidance, queue_size = 1)
         self.sub_image_original = rospy.Subscriber(self._camera_topic, CompressedImage, self.cbFindLane, queue_size = 1)
+
+        self.sub_bb_duckies = rospy.Subscriber(self._bb_duckies_topic, Float64MultiArray, self.cbBBDuckies, queue_size = 1)
 
         self.pub_lane = rospy.Publisher(f'/{self._vehicle_name}/detect/lane', Float64, queue_size = 1)
         self.pub_orientation = rospy.Publisher(f'/{self._vehicle_name}/detect/orientation', Float64, queue_size=1)
@@ -52,6 +55,8 @@ class DetectLaneNode(DTROS):
         self.drive_left_timer = 0
         self.drive_left_timer_run = False
         self.roi_line_msg = Float64MultiArray()
+
+        self.bb_duckies = Float64MultiArray()
 
         self.center_history = deque(maxlen=5)
 
@@ -77,6 +82,8 @@ class DetectLaneNode(DTROS):
         #print("msg: ", avoiding_obstacles_msg.data)
         self.avoiding_obstacles = avoiding_obstacles_msg.data
 
+    def cbBBDuckies(self, msg):
+        self.bb_duckies = msg
 
     def cbFindLane(self, image_msg):
         # 10 HZ -> 0.1 second
@@ -99,6 +106,21 @@ class DetectLaneNode(DTROS):
 
         np_arr = np.frombuffer(image_msg.data, np.uint8)
         cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        # cv_image_copy = cv_image.copy()
+        
+        # Bounding Box ausschneiden
+        # if self.bb_duckies is not None:
+        # for result in self.bb_duckies:
+        #     top_left_corner = (result[0], result[1])
+        #     bottom_right_corner = (result[2], result[3])
+        #     cv2.rectangle(cv_image_copy, top_left_corner, bottom_right_corner, -1)
+        Black = (0,0,0)
+        if self.bb_duckies is not None and len(self.bb_duckies.data) >=4:
+            top_left_corner = (int(self.bb_duckies.data[0]), int(self.bb_duckies.data[1]))
+            bottom_right_corner = (int(self.bb_duckies.data[2]), int(self.bb_duckies.data[3]))
+            cv2.rectangle(cv_image, top_left_corner, bottom_right_corner,Black, -1)
+            # cv2.imshow("Rechteck",cv_image_copy)
+
         bv_img = self.transformToBirdsView(cv_image)
         bv_img = bv_img[self.look_distance:, :]
         
@@ -139,7 +161,7 @@ class DetectLaneNode(DTROS):
         #         filtered_yellow_contours.append(contour)
 
         white_contours = []
-
+        middle_pt_far_enough = False
         # calculate middle_pts of line segments
         middle_pts = []
         mask_x_center = mask_yellow.shape[1] // 2
@@ -154,10 +176,13 @@ class DetectLaneNode(DTROS):
                 if dist > 120:
                     continue
             # accept middlepoint of line segment if it is within self.middle_line_look_width                                 cy nicht vergessen!!!!!!!!!!!!!!!!
-            if cx >= mask_x_center - self.middle_line_look_width/2 and cx <= mask_x_center + self.middle_line_look_width and cy > 70:
+            if cx >= mask_x_center - self.middle_line_look_width/2 and cx <= mask_x_center + self.middle_line_look_width and cy > 90:
                 middle_pts.append((cx,cy))
                 cv2.circle(bv_img, (cx, cy), 5, (0, 0, 255), -1)
                 
+                if cy < 190 and middle_pt_far_enough == False:
+                    middle_pt_far_enough = True
+
                 if len(middle_pts) == self.num_middle_pts:
                     break
         
@@ -199,6 +224,9 @@ class DetectLaneNode(DTROS):
                         sideline_pts.append((int(new_x), int(new_y)))
                         midpoint = (int((new_x + middle_pts[viewed_pt][0]) / 2.0), int((new_y + middle_pts[viewed_pt][1]) / 2.0))
                         desired_centers.append(midpoint)
+                        middle_pt_far_enough = True
+                        # if midpoint[1] < 190 and middle_pt_far_enough == False:
+                        #     middle_pt_far_enough = True
 
                         if self.show_output_img:
                             cv2.circle(bv_img, (int(new_x), int(new_y)), 5, (0, 255, 0), -1)
@@ -222,6 +250,7 @@ class DetectLaneNode(DTROS):
         else:
             white_contours, _ = cv2.findContours(mask_white, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             if white_contours:
+                middle_pt_far_enough = True
                 # find lowest contur (highest y-Wert)
                 lowest_contour = max(white_contours, key=lambda c: cv2.boundingRect(c)[1] + cv2.boundingRect(c)[3])
                 cx, cy = calcMiddlePtOfContours(lowest_contour)
@@ -238,11 +267,14 @@ class DetectLaneNode(DTROS):
         # set the absolute x-value of close points higher for faster reaction
         for i, pt in enumerate(desired_centers):
             if pt[0] > 150:
-                diff = ((width/2) - pt[0]) * -2.0   # double the difference by adding it one additional time
+                diff = ((width/2) - pt[0]) * -1.2   # double the difference by adding it one additional time
                 new_x = pt[0] + diff
                 desired_centers[i] = (new_x, pt[1])
-                # if i == len(desired_centers) -1:
-                #     print("DOPPLE LETZTEN PUNKT ", i)
+
+        if middle_pt_far_enough == False:
+            hard_centers = []
+            hard_centers.append((650, 250))
+            desired_centers = hard_centers
 
         msg_desired_center = Float64()
 
@@ -351,7 +383,8 @@ class DetectLaneNode(DTROS):
         #         msg_desired_center = Float64()
         #         msg_desired_center.data = float(desired_centers[-1][0])
         #         self.pub_lane.publish(msg_desired_center)
-
+        #
+########################################### Interpolation END ######################################################################
 
 
 

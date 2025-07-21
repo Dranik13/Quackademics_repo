@@ -49,6 +49,7 @@ class DetectDuckieBot(DTROS):
         self.pt2_img = None
         self.boxes_msg = Float64MultiArray()
         self.duckie_boxes = []
+        self.roi_polygon = None
 
         # Fahrbereich
         self.static_roi_polygon = np.array([
@@ -207,9 +208,9 @@ class DetectDuckieBot(DTROS):
                 pt1_right = (self.pt1_img[0] + (roi_width*1.5), self.pt1_img[1]-40)
                 pt2_right = (self.pt2_img[0] + roi_width, self.pt2_img[1])
 
-                roi_polygon = np.array([self.pt1_img, self.pt2_img, pt2_right, pt1_right])
+                self.roi_polygon = np.array([self.pt1_img, self.pt2_img, pt2_right, pt1_right])
                 if self.conf['debugging_output']['input_image']:
-                    cv2.polylines(image, [roi_polygon.astype(np.int32).reshape((-1, 1, 2))], isClosed=True, color=(255, 0, 0), thickness=2)
+                    cv2.polylines(image, [self.roi_polygon.astype(np.int32).reshape((-1, 1, 2))], isClosed=True, color=(255, 0, 0), thickness=2)
 
             
         for result in results:
@@ -227,7 +228,7 @@ class DetectDuckieBot(DTROS):
                 # Parkplatzerkennung
                 if self.parking_spot_detected:
                     # Prüfe auf Überschneidung
-                    if self.bbox_overlaps_roi([x1, y1, x2, y2], roi_polygon):
+                    if self.bbox_overlaps_roi([x1, y1, x2, y2], self.roi_polygon):
                         self.occupied_parkingspot = True
                         if self.conf['debugging_output']['input_image']:
                             cv2.putText(image, "OVERLAP", (x1, y2 + 15),
@@ -239,12 +240,13 @@ class DetectDuckieBot(DTROS):
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                             
         # erkennung Duckies im Parkplatz
-        for x1, y1, x2, y2 in self.duckie_boxes:
-            if self.bbox_overlaps_roi([x1, y1, x2, y2], roi_polygon):
-                self.occupied_parkingspot = True
-                if self.conf['debugging_output']['input_image']: 
-                    cv2.putText(image, "OVERLAP", (x1, y2 + 15),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+        if self.roi_polygon is not None:
+            for x1, y1, x2, y2 in self.duckie_boxes:
+                if self.bbox_overlaps_roi([x1, y1, x2, y2], self.roi_polygon):
+                    self.occupied_parkingspot = True
+                    if self.conf['debugging_output']['input_image']: 
+                        cv2.putText(image, "OVERLAP", (x1, y2 + 15),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
                     
         cv2.polylines(image, [self.static_roi_polygon.astype(np.int32).reshape((-1, 1, 2))], isClosed=True, color=(0, 0, 255), thickness=2)
         # Bild publishen

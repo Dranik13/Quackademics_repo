@@ -43,7 +43,7 @@ line_detection_params:
   # alle Pixel deren y-Wert unter diesem Wert liegt werden nicht betrachtet (Parameter funktioniert irgendwie nicht richtig -> im Code erste Zeile in cvFindlane())
   look_distance: 60
   # Bildbreite um Bildmitte in der nach der Mittellinie gesucht wird
-  middle_line_look_width: 200 
+  middle_line_look_width: 300
   # Wenn vom Mittellinienpunkt aus kein weißes Pixel gefunden wurde, wird in dieser definierten distanz ein Orientierungspunkt gesetzt
   def_dist_middle_line: 60
   # Anz. an Mittelliniensegmenten die betrachtet werden 
@@ -65,3 +65,5 @@ controller:
   max_speed: 0.2
   min_speed_percent: 0.4
   max_steering_angle: 5
+challenge:
+  number: 1
