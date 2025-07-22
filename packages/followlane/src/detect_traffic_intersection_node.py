@@ -55,7 +55,7 @@ class CrossingIntersectionNode(DTROS):
         self.stop_active = False
         self.last_selected_direction = None  # Neu: letzte gewählte Richtung speichern
 
-        self.cooldown_time = 1.5  # Sekunden
+        self.cooldown_time = 0  # Sekunden
         self.last_direction_time = 0  # Zeitpunkt der letzten Richtungswahl
 
     def cbImageCallback(self, image_msg):
@@ -115,7 +115,7 @@ class CrossingIntersectionNode(DTROS):
                     4
                 )
 
-        # Debug-Bild senden (nur wenn Sub vorhanden)
+         #Debug-Bild senden
 
         debug_msg = self.bridge.cv2_to_imgmsg(debug_img, encoding="bgr8")
         self.pub_debug_img.publish(debug_msg)
