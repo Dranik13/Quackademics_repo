@@ -78,7 +78,7 @@ search_for_parking_lot:
 debugging_output:
   line_coordinates: false
   input_image: false
-  output_image: true
+  output_image: false
   mask_white: false
   mask_yellow: false
 controller:
