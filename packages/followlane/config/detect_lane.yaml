@@ -24,19 +24,39 @@ duckie_detect:
   top_right_x: 480
   top_right_y: 250
 white:
-  hh: 125
-  hl: 50
-  sh: 80
+  # hh: 125
+  # hl: 50
+  # sh: 80
+  # sl: 0
+  # vh: 255
+  # vl: 172
+  hh: 180
+  hl: 0
+  sh: 35
   sl: 0
   vh: 255
-  vl: 172
+  vl: 170
 yellow:
+  # hh: 40
+  # hl: 15
+  # sh: 255
+  # sl: 40
+  # vh: 255
+  # vl: 120
   hh: 40
   hl: 15
   sh: 255
-  sl: 40
+  sl: 60
   vh: 255
-  vl: 120
+  vl: 130
+red:
+  hh: 0
+  hl: 10
+  sh: 220
+  sl: 81
+  vh: 255
+  vl: 70
+
 line_detection_params:
   # maximale lücke zwischen Mittel- und Seitenlinie
   max_line_gap: 150
@@ -57,8 +77,8 @@ search_for_parking_lot:
   max_y_diff: 70
 debugging_output:
   line_coordinates: false
-  input_image: True
-  output_image: false
+  input_image: false
+  output_image: true
   mask_white: false
   mask_yellow: false
 controller:

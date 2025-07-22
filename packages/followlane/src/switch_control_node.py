@@ -123,7 +123,7 @@ class SwitchControlNode(DTROS):
             self.state = ControlType.Obstacle
             return
 
-        if self.lane_detected:
+        if self.lane_detected and not self._Obstacle_enabled:
             if self.state != ControlType.Lane:
                 rospy.loginfo("Spur erkannt. Wechsle zu Lane-Modus.")
             self.state = ControlType.Lane

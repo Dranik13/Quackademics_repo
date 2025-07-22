@@ -55,7 +55,7 @@ class CrossingIntersectionNode(DTROS):
         self.stop_active = False
         self.last_selected_direction = None  # Neu: letzte gewählte Richtung speichern
 
-        self.cooldown_time = 2.0  # Sekunden
+        self.cooldown_time = 1.5  # Sekunden
         self.last_direction_time = 0  # Zeitpunkt der letzten Richtungswahl
 
     def cbImageCallback(self, image_msg):
@@ -191,7 +191,7 @@ class CrossingIntersectionNode(DTROS):
 
         y_schwelle = int(height * distance)
         for c in contours:
-            if cv2.contourArea(c) > 500:
+            if cv2.contourArea(c) > 1500:
                 for point in c:
                     y = point[0][1]
                     if y >= y_schwelle:

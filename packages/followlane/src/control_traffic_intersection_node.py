@@ -26,7 +26,7 @@ MOVEMENT_PARAMS = {
 
 class ControlCrossingNode(DTROS):
     def __init__(self, node_name):
-        super(ControlCrossingNode, self).__init__(node_name=node_name, node_type=NodeType.GENERIC)
+        super(ControlCrossingNode, self).__init__(node_name=node_name, node_type=NodeType.VISUALIZATION)
 
         self._vehicle_name = os.environ['VEHICLE_NAME']
 
@@ -54,6 +54,7 @@ class ControlCrossingNode(DTROS):
 
         self._motion_elapsed = 0.0
         self._last_time = time.time()
+        self._last_box_time = time.time()
 
     def cbBoundingBox(self, msg):
         """Callback zur Auswertung der Bounding Boxen von Duckiebots im Kreuzungsbereich."""
@@ -77,6 +78,7 @@ class ControlCrossingNode(DTROS):
             self.crossing_blocked = True
             rospy.loginfo(f"[Crossing] {valid_boxes} große BoundingBox(en) erkannt – Kreuzung blockiert.")
         else:
+            self._last_box_time = time.time()
             if self.crossing_blocked:
                 rospy.loginfo("[Crossing] Kreuzung wieder frei.")
             self.crossing_blocked = False
@@ -114,9 +116,8 @@ class ControlCrossingNode(DTROS):
             return CrossingMode.Idle
 
     def run(self):
-        rate = rospy.Rate(10)  # 10 Hz
+        rate = rospy.Rate(10)  # 10 Hz → Schleife läuft 10x pro Sekunde
 
-        # Initialisiere Zeit für Bewegungstimer
         self._motion_elapsed = 0.0
         self._last_time = time.time()
 
@@ -126,27 +127,34 @@ class ControlCrossingNode(DTROS):
             delta_time = current_time - self._last_time
             self._last_time = current_time
 
+            # Timeout-Prüfung für crossing_blocked (1 Sekunde ohne neue Box → frei)
+            if time.time() - self._last_box_time > 1.0:
+                if self.crossing_blocked:
+                    rospy.loginfo("[Crossing] Timeout – Kreuzung wird als frei angenommen.")
+                self.crossing_blocked = False
+
+            # 🚦 Nur wenn ein gültiger Modus aktiv ist
             if self._mode != CrossingMode.Idle:
                 if self._crossing_active:
                     if self.crossing_blocked:
-                        # Manöver pausiert – nicht weiterzählen
+                        # Kreuzung ist blockiert → Bewegung pausiert
                         rospy.loginfo_throttle(2.0, "[Crossing] Warten – Kreuzung blockiert.")
                         twist.v = 0.0
                         twist.omega = 0.0
                     else:
-                        # Zeit läuft nur weiter, wenn Kreuzung frei
+                        # Kreuzung ist frei → Zeit fortschreiben und ggf. fahren
                         self._motion_elapsed += delta_time
 
                         if self._motion_elapsed < 2.0:
-                            # Wartezeit vor Bewegung
+                            # Sicherheitswartezeit (Stillstand)
                             twist.v = 0.0
                             twist.omega = 0.0
                         else:
-                            # Aktive Bewegung
+                            # ▶️ Aktives Manöver ausführen
                             twist.v = self._movement['v']
                             twist.omega = self._movement['omega']
 
-                    # Prüfen, ob Manöver abgeschlossen ist
+                    # Prüfen, ob das Manöver vollständig abgeschlossen ist
                     total_duration = 2.0 + self._movement['duration']
                     if self._motion_elapsed >= total_duration:
                         rospy.loginfo("[Crossing] Manöver abgeschlossen.")
@@ -156,18 +164,16 @@ class ControlCrossingNode(DTROS):
                         twist.v = 0.0
                         twist.omega = 0.0
                 else:
-                    # Kein aktives Manöver → Stillstand
+                    # 💤 Kein aktives Manöver → Stillstand
                     twist.v = 0.0
                     twist.omega = 0.0
 
+                # Aktuellen Bewegungsbefehl senden
                 self.pub_cmd_vel.publish(twist)
 
             rate.sleep()
 
-
-
-
-if __name__ == '__main__':
+if __name__ == '_main_':
     # rospy.init_node('control_crossing_node')
     node = ControlCrossingNode(node_name='control_crossing_node')
     node.run()
