@@ -83,7 +83,12 @@ class ControlCrossingNode(DTROS):
             self.pub_crossing_enabled.publish(Bool(data=True))
             rospy.loginfo(f"[Crossing] Startet Manöver: {self._mode.name}")
         else:
-            rospy.logwarn("[Crossing] Ungültige Richtung erhalten – keine Aktion")
+            rospy.logwarn("[Crossing] Ungültige Richtung erhalten – Kreuzungsmanöver abbrechen.")
+            # Hier abbrechen / zurücksetzen:
+            self._crossing_active = False
+            self._movement = {'v': 0.0, 'omega': 0.0, 'duration': 0.0}
+            self.pub_crossing_enabled.publish(Bool(data=False))
+            self._mode = CrossingMode.Idle
 
     def determine_mode(self, flags):
         """Bitmaske auswerten → konkrete Fahraktion bestimmen."""

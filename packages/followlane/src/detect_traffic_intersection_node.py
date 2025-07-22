@@ -154,7 +154,7 @@ class CrossingIntersectionNode(DTROS):
         mask[:roi_start, :] = 0
 
         contours_all, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        filtered = [c for c in contours_all if cv2.contourArea(c) >= 1000]
+        filtered = [c for c in contours_all if cv2.contourArea(c) >= 500]
         contours = sorted(filtered, key=cv2.contourArea, reverse=True)[:4]
 
         image_copy = image.copy()
