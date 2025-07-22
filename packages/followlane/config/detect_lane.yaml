@@ -77,10 +77,11 @@ search_for_parking_lot:
   max_y_diff: 70
 debugging_output:
   line_coordinates: false
-  input_image: true
-  output_image: false
+  input_image: false
+  output_image: true
   mask_white: false
   mask_yellow: false
+  mask_DuckieBot:true
 controller:
   max_speed: 0.2
   min_speed_percent: 0.4

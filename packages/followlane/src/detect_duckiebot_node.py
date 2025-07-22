@@ -50,6 +50,7 @@ class DetectDuckieBot(DTROS):
         self.boxes_msg = Float64MultiArray()
         self.duckie_boxes = []
         self.roi_polygon = None
+        self.occupied_parkingspot = False
 
         # Fahrbereich
         self.static_roi_polygon = np.array([
@@ -209,7 +210,7 @@ class DetectDuckieBot(DTROS):
                 pt2_right = (self.pt2_img[0] + roi_width, self.pt2_img[1])
 
                 self.roi_polygon = np.array([self.pt1_img, self.pt2_img, pt2_right, pt1_right])
-                if self.conf['debugging_output']['input_image']:
+                if self.conf['debugging_output']['mask_DuckieBot']:
                     cv2.polylines(image, [self.roi_polygon.astype(np.int32).reshape((-1, 1, 2))], isClosed=True, color=(255, 0, 0), thickness=2)
 
             
@@ -230,10 +231,10 @@ class DetectDuckieBot(DTROS):
                     # Prüfe auf Überschneidung
                     if self.bbox_overlaps_roi([x1, y1, x2, y2], self.roi_polygon):
                         self.occupied_parkingspot = True
-                        if self.conf['debugging_output']['input_image']:
+                        if self.conf['debugging_output']['mask_DuckieBot']:
                             cv2.putText(image, "OVERLAP", (x1, y2 + 15),
                                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-                if self.conf['debugging_output']['input_image']:
+                if self.conf['debugging_output']['mask_DuckieBot']:
                     # Bounding Box zeichnen
                     cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
                     cv2.putText(image, label, (x1, y1 - 5),
@@ -244,17 +245,17 @@ class DetectDuckieBot(DTROS):
             for x1, y1, x2, y2 in self.duckie_boxes:
                 if self.bbox_overlaps_roi([x1, y1, x2, y2], self.roi_polygon):
                     self.occupied_parkingspot = True
-                    if self.conf['debugging_output']['input_image']: 
+                    if self.conf['debugging_output']['mask_DuckieBot']: 
                         cv2.putText(image, "OVERLAP", (x1, y2 + 15),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
                     
         cv2.polylines(image, [self.static_roi_polygon.astype(np.int32).reshape((-1, 1, 2))], isClosed=True, color=(0, 0, 255), thickness=2)
         # Bild publishen
-        if self.conf['debugging_output']['input_image'] or True:
-            ros_img = self.bridge.cv2_to_imgmsg(image, encoding="bgr8")
-            self.pub_image.publish(ros_img)
+        # if self.conf['debugging_output']['input_mask_DuckieBot'] or True:
+        #     ros_img = self.bridge.cv2_to_imgmsg(image, encoding="bgr8")
+        #     self.pub_image.publish(ros_img)
         self.pub_duckie_box.publish(self.boxes_msg)
-        self.pub_parking_free.publish(Bool(data=not self.occupied_parkingspot))
+        self.pub_parking_free.publish(Bool(data= self.occupied_parkingspot))
         if self.occupied_parkingspot:
             rospy.loginfo("Parkplatz Belegt")
 
@@ -269,9 +270,6 @@ class DetectDuckieBot(DTROS):
         if image is not None:
             results = self._model(image, verbose=False)
             self.draw_boxes(results, image)
-            
-
-        
 
     def run(self):
         rospy.spin()
