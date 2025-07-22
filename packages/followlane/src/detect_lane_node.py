@@ -47,6 +47,7 @@ class DetectLaneNode(DTROS):
         
         self.pub_parking_spot = rospy.Publisher(f'/{self._vehicle_name}/detect/parking_spot', Bool, queue_size=1)
         self.pub_parking_debug = rospy.Publisher(f"/{self._vehicle_name}/debug/parking_img", Image, queue_size=1)
+        self.pub_parking_roi_px = rospy.Publisher(f"/{self._vehicle_name}/detect/parking_roi_px", Float64MultiArray, queue_size=1)
 
 
         self._bridge = CvBridge()
@@ -54,8 +55,11 @@ class DetectLaneNode(DTROS):
         self.counter = 0
         self.avoiding_obstacles = False
         self.drive_left = False
-        self.drive_left_timer = 0
-        self.drive_left_timer_run = False
+        self.obstacle_avoidance_timer = 0
+        self.obstacle_avoidance_timer_run = False
+
+        self.avoidance_cooldown = 0
+        self.cooldown_after_obstacle_avoidance = True
         self.roi_line_msg = Float64MultiArray()
 
         self.bb_duckiebots = Float64MultiArray()
@@ -100,15 +104,26 @@ class DetectLaneNode(DTROS):
             self.counter += 1
         if self.avoiding_obstacles:
             self.drive_left = True
-            self.drive_left_timer_run = True
+            self.obstacle_avoidance_timer_run = True
+            self.obstacle_avoidance_timer = 0
+            self.cooldown_after_obstacle_avoidance = False
 
-        if self.drive_left_timer_run == True:
-            self.drive_left_timer += 1
-            # print("timer: ", self.drive_left_timer / 10)
+        if self.obstacle_avoidance_timer_run == True:
+            self.obstacle_avoidance_timer += 1
+            # print("timer: ", self.obstacle_avoidance_timer / 10)
                                         # 2 seconds         
-            if self.drive_left_timer >= 40:
-                self.drive_left_timer_run = False
-                self.drive_left_timer = 0
+            if self.obstacle_avoidance_timer >= 40:
+                self.obstacle_avoidance_timer_run = False
+                self.obstacle_avoidance_timer = 0
+                self.avoidance_cooldown = True
+        
+        if self.cooldown_after_obstacle_avoidance == False and self.obstacle_avoidance_timer_run == False:
+            self.obstacle_avoidance_timer += 1
+            print("Timer: ", self.obstacle_avoidance_timer, " Betrachte Linie: ", self.cooldown_after_obstacle_avoidance)
+
+
+        if self.obstacle_avoidance_timer >= 80:
+            self.cooldown_after_obstacle_avoidance = True
 
         np_arr = np.frombuffer(image_msg.data, np.uint8)
         cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
@@ -205,7 +220,7 @@ class DetectLaneNode(DTROS):
         previous_dx = 0
         previous_dy = 0
         # search for right line if a middle line was found
-        if len(middle_pts) >= 2 and self.avoiding_obstacles == False and self.drive_left_timer_run == False:
+        if len(middle_pts) >= 2 and self.avoiding_obstacles == False and self.obstacle_avoidance_timer_run == False:
             self.drive_left = False
             viewed_pt = 0
 
@@ -283,29 +298,30 @@ class DetectLaneNode(DTROS):
                 diff = ((width/2) - pt[0]) * -1.2   # double the difference by adding it one additional time
                 new_x = pt[0] + diff
                 desired_centers[i] = (new_x, pt[1])
-        
-        if middle_pt_far_enough == True:
-            middle_pt_far_enough = checkForRedLine(original_bv_img)
 
         if middle_pt_far_enough == False:
-            hard_centers = []
-            hard_centers.append((650, 250))
-            desired_centers = hard_centers
+            red_line_detected = checkForRedLine(original_bv_img)
+            if red_line_detected and self.cooldown_after_obstacle_avoidance == True:
+                hard_centers = []
+                hard_centers.append((650, 250))
+                desired_centers = hard_centers
 
         msg_desired_center = Float64()
 
         if len(desired_centers) >= 2 and desired_centers[len(desired_centers)-1][1] >= 110:
             msg_desired_center.data = float(desired_centers[len(desired_centers)-1][0])
             self.pub_lane.publish(msg_desired_center)
+            # print("SENDE: ", msg_desired_center)
 
         elif len(desired_centers) >= self.control_pt_nr:
             msg_desired_center.data = float(desired_centers[self.control_pt_nr-1][0])
             self.pub_lane.publish(msg_desired_center)
+            # print("SENDE: ", msg_desired_center)
 
         elif desired_centers:
             msg_desired_center.data = float(desired_centers[len(desired_centers)-1][0])
             self.pub_lane.publish(msg_desired_center)
-
+            # print("SENDE: ", msg_desired_center)
 ################################################################ INTERPOLATION ################################################################
         
         # # Nur ausführen, wenn ausreichend viele Zielpunkte vorhanden sind (mindestens 4)
@@ -550,6 +566,8 @@ class DetectLaneNode(DTROS):
             cv2.imshow("mask yellow", mask_yellow)
         if self.show_input_img:
             cv2.imshow("input image", cv_image)
+        # if self.show_mask_red:
+        #     cv2.imshow("Red Mask", mask_red)
         cv2.waitKey(1)
 
     def interpolate_points(self, points, num_points=15):
@@ -665,17 +683,17 @@ def checkForRedLine(img):
     mask_red = cv2.bitwise_or(mask_red1, mask_red2)
 
     # Bild mit roten Pixeln anzeigen
-    cv2.imshow("Red Mask", mask_red)
-    cv2.waitKey(1)
+    # cv2.imshow("Red Mask", mask_red)
+    # cv2.waitKey(1)
 
     red_pixel_count = cv2.countNonZero(mask_red)
-    red_pixel_threshold = 150
+    red_pixel_threshold = 500
 
     if red_pixel_count >= red_pixel_threshold:
         # print("LINIE ERKANNT!!!")
-        return True
-    else:
         return False
+    else:
+        return True
 
 if __name__ == '__main__':
 

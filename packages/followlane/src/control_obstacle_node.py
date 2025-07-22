@@ -67,9 +67,11 @@ class ControlObstacleNode(DTROS):
             else:
                 self._control_mode = ObstacleMode.Move
             
-            if self._counter >= 10:
+            if self._counter >= 8:
                 self._control_mode = ObstacleMode.Stop
                 self.enable = False
+                twist = Twist2DStamped(v=0.0, omega=0)
+                self.pub_cmd_vel.publish(twist)
                 self.pub_Obstacle_enabled.publish(Bool(data=False))
                 self._counter = 0
             

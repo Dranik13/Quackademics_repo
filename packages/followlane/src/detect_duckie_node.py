@@ -105,7 +105,7 @@ class DetectDuckieNode(DTROS):
         self.pub_duckie_boxes.publish(self.boxes_msg) 
 
     def draw_bounding_boxes(self, results, img):
-        #print("results: ", len(results[0].boxes))
+        # print("results: ", len(results[0].boxes))
         for result in results:
             for box in result.boxes:
                 cv2.rectangle(img, (int(box.xyxy[0][0]), int(box.xyxy[0][1])),
