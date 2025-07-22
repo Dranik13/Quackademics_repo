@@ -40,8 +40,6 @@ class SwitchControlNode(DTROS):
         self._parking_active = False
 
         self.pending_direction = None
-        self.last_crossing_end_time = rospy.get_time()
-        self.cooldown_duration = 3.0  # Sekunden
 
     # --- CALLBACKS ---
 
@@ -84,12 +82,8 @@ class SwitchControlNode(DTROS):
         self.update_state()
 
     def cbDirectionReceived(self, msg):
-        now = rospy.get_time()
         if self._crossing_enabled:
             rospy.logwarn("Richtung empfangen, aber Kreuzung läuft bereits.")
-            return
-        if now - self.last_crossing_end_time < self.cooldown_duration:
-            rospy.logwarn("Richtung empfangen, aber Cooldown läuft.")
             return
         self.pending_direction = msg.data
         rospy.loginfo(f"Neue Richtung empfangen: {self.pending_direction}")

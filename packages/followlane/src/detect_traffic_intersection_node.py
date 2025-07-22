@@ -55,9 +55,6 @@ class CrossingIntersectionNode(DTROS):
         self.stop_active = False
         self.last_selected_direction = None  # Neu: letzte gewählte Richtung speichern
 
-        self.cooldown_time = 0  # Sekunden
-        self.last_direction_time = 0  # Zeitpunkt der letzten Richtungswahl
-
     def cbImageCallback(self, image_msg):
         
         # Konvertierung des CompressedImage in ein OpenCV-Bild
@@ -71,18 +68,13 @@ class CrossingIntersectionNode(DTROS):
         # Flag für Stop erkennen ermitteln
         stop_detected = bool(flags_bin & self.DIRECTIONS["Stop"])
 
-        # Wenn Stop erkannt wurde und noch nicht aktiv, wähle eine Richtung
-        current_time = rospy.get_time()
-        cooldown_passed = (current_time - self.last_direction_time) > self.cooldown_time
-
-        if stop_detected and not self.stop_active and cooldown_passed:
+        if stop_detected and not self.stop_active:
             selected_flags = self.choose_random_direction(flags_bin)
             selected_flags_bin = sum(
                 bit for key, bit in self.DIRECTIONS.items() if selected_flags.get(key, False)
             )
             self.pub_direction.publish(Int32(data=selected_flags_bin))
             rospy.loginfo(f"[Intersection] Richtung gesendet: {bin(selected_flags_bin)}")
-            self.last_direction_time = current_time
             self.stop_active = True
 
             # Gewählte Richtung speichern für das Debug-Overlay
@@ -162,7 +154,7 @@ class CrossingIntersectionNode(DTROS):
         mask[:roi_start, :] = 0
 
         contours_all, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        filtered = [c for c in contours_all if cv2.contourArea(c) >= 500]
+        filtered = [c for c in contours_all if cv2.contourArea(c) >= 1000]
         contours = sorted(filtered, key=cv2.contourArea, reverse=True)[:4]
 
         image_copy = image.copy()
@@ -191,7 +183,7 @@ class CrossingIntersectionNode(DTROS):
 
         y_schwelle = int(height * distance)
         for c in contours:
-            if cv2.contourArea(c) > 1500:
+            if cv2.contourArea(c) > 2000:
                 for point in c:
                     y = point[0][1]
                     if y >= y_schwelle:
