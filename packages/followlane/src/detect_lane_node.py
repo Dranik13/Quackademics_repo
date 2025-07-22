@@ -545,8 +545,8 @@ class DetectLaneNode(DTROS):
 
             # Stabilitäts-Entscheidung: mind. 7 von 10
             stable_parking = sum(self.parking_buffer) >= 3
-            
-            self.pub_parking_spot.publish(Bool(data=stable_parking))
+            if stable_parking:
+                self.pub_parking_spot.publish(Bool(data=stable_parking))
             #rospy.loginfo_throttle(1, f"Publishing parking: {found_parking}")
             #rospy.loginfo_throttle(1, f"Parkplatz-Erkennung: potenziell={len(potential_parking_lot_marks)}, akzeptiert={len(parking_lot_marks)}")
 
@@ -597,10 +597,10 @@ class DetectLaneNode(DTROS):
         # print("interpolate points: ", interp)
         return interp
       
-        from cv_bridge import CvBridge
-        bridge = CvBridge()
-        ros_img = bridge.cv2_to_imgmsg(bv_img, encoding="bgr8")
-        self.pub_parking_debug.publish(ros_img)
+        # from cv_bridge import CvBridge
+        # bridge = CvBridge()
+        # ros_img = bridge.cv2_to_imgmsg(bv_img, encoding="bgr8")
+        # self.pub_parking_debug.publish(ros_img)
 
     
     def load_conf(self,path):

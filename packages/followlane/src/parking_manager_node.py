@@ -27,6 +27,7 @@ class ParkingManagerNode(DTROS):
         self.min_detection_duration = 0.2  # Sekunden
         self.parking_started = False
         self.parking_timer_started = False
+        self.parking_spot_occupied = False
 
 
         # Publisher
@@ -39,7 +40,7 @@ class ParkingManagerNode(DTROS):
         self.sub_parkingspot=rospy.Subscriber(f"/{self._vehicle_name}/detect/parking_spot", Bool, self.cb_parking_spot,queue_size = 1)
         self.sub_parked=rospy.Subscriber(f"/{self._vehicle_name}/status/parked", Bool, self.cb_parked_status,queue_size = 1)
         self.sub_unparked = rospy.Subscriber(f"/{self._vehicle_name}/status/unparked", Bool, self.cb_unparked, queue_size=1)
-
+        self.sub_occupied = rospy.Subscriber(f"/{self._vehicle_name}/parking/free", Bool, self.cb_parking_occupied, queue_size=1)
 
         # Optional: später aktivieren
         # rospy.Subscriber(f"/{self._vehicle_name}/detect/duckie_parking", Bool, self.cb_duckie_detected)
@@ -47,59 +48,25 @@ class ParkingManagerNode(DTROS):
 
         rospy.loginfo("ParkingManagerNode initialisiert.")
 
-    # def cb_parking_spot(self, msg):
-        
-    #     if msg.data:
-    #         # Wenn Parkplatz erkannt, Timer starten (nur beim ersten Mal)
-    #         if not self.parking_spot_detected:
-    #             self.spot_detected_time = rospy.Time.now()
-    #             rospy.loginfo("Parkplatz erkannt TimerStarten.")
-    #         self.parking_spot_detected = True
-            
-    #     elif self.parking_spot_detected and not self.parking_started:
-    #         # Wenn Parkplatz verschwindet und vorher erkannt wurde
-    #         duration = (rospy.Time.now() - self.spot_detected_time).to_sec()
-             
-    #         # EINZIGE BEDINGUNG: stabile Erkennung über Zeitraum
-    #         if duration >= self.min_detection_duration:
-    #             rospy.loginfo("Stabiler Parkplatz erkannt. Starte PARKING-Modus.")
-    #             self.start_parking()
-    #         # Rücksetzen
-    #         self.parking_spot_detected = False
-    #         self.spot_detected_time = None
+ 
     def cb_parking_spot(self, msg):
-        if msg.data and not self.parking_started:
-            rospy.loginfo("📍 Parkplatz erkannt. Starte PARKING-Modus sofort.")
+        rospy.loginfo(f"Parkplatz erkannt: {msg.data}, Parkplatz aktiv: {self.parking_started} , Parkplatz belegt: {self.parking_spot_occupied }")
+        if msg.data and not self.parking_started and not self.cb_parking_occupied:
+            rospy.loginfo("Parkplatz erkannt. Starte PARKING-Modus sofort.")
             self.start_parking()
 
-    # Optional: später aktivieren
-    # def cb_duckie_detected(self, msg):
-    #     self.duckie_detected = msg.data
+    def cb_parking_occupied(self, msg):
+        self.parking_spot_occupied = msg.data
 
-    # def cb_duckie_box(self, msg):
-    #     if len(msg.data) == 2:
-    #         _, y = msg.data
-    #         self.box_position_y = y
-
-    # def start_timer(self):
-    #     self.counter = 0
-    #     self.timer = rospy.Timer(rospy.Duration(0.1), self.cb_timer)
-
-    # def cb_timer(self, event):
-    #     self.counter += 1
-
-    #     if self.counter >= 20:
-    #         self.timer.shutdown()
-    #         self.start_parking()
 
     def start_parking(self):
         if not self.parking_started:
-            rospy.loginfo("⏱️ Verzögertes Einparken in 1 Sekunde geplant...")
-            rospy.Timer(rospy.Duration(1.5), self._delayed_start_parking, oneshot=True)
+            rospy.loginfo("Verzögertes Einparken in 1 Sekunde geplant...")
+            rospy.Timer(rospy.Duration(2.0), self._delayed_start_parking, oneshot=True)
             self.parking_started = True  # Schon jetzt setzen, damit keine Dopplung entsteht
 
     def _delayed_start_parking(self, event):
-        rospy.loginfo("🅿️ Sende Parkaktivierungs-Flag an SwitchControl.")
+        rospy.loginfo("Sende Parkaktivierungs-Flag an SwitchControl.")
         self.pub_parking_active.publish(Bool(data=True))
 
     def cb_parked_status(self, msg):
@@ -108,16 +75,12 @@ class ParkingManagerNode(DTROS):
             self.parking_timer_started = True
             self.timer = rospy.Timer(rospy.Duration(0.1), self.cb_parking_timer)
             self.timer_count = 0
-
-        # elif not msg.data:
-        #     rospy.loginfo("🅿️ Parkplatz freigegeben – bereit für neuen Vorgang")
-        #     self.parking_started = False
-        #     self.parking_timer_started = False    
+   
 
     def cb_parking_timer(self, event):
         self.timer_count += 1
         if self.timer_count >= 50:  # z. B. 5 Sekunden bei 10Hz
-            rospy.loginfo("⏭️ Parkzeit abgelaufen – starte Ausparken")
+            rospy.loginfo("Parkzeit abgelaufen – starte Ausparken")
             self.timer.shutdown()
 
             # Starte Auspark-Routine
@@ -125,17 +88,18 @@ class ParkingManagerNode(DTROS):
     
     def cb_unparked(self, msg):
         if msg.data:
-            # rospy.loginfo("✅ Ausparkvorgang abgeschlossen – zurück zu Spurfolge.")
+            # rospy.loginfo(" Ausparkvorgang abgeschlossen – zurück zu Spurfolge.")
             self.pub_parking_active.publish(Bool(data=False))  # Triggert Rückschaltung auf Lane
-             # Starte Verzögerungstimer (z. B. 1 Sekunde)
+            self.pub_unpark.publish(Bool(data=False))
+            # Starte Verzögerungstimer (z. B. 1 Sekunde)
             rospy.Timer(rospy.Duration(2.0), self._reset_after_unparking, oneshot=True)
-
+            
     def _reset_after_unparking(self, event):
         self.parking_started = False
         self.parking_timer_started = False
         #self.parking_spot_detected = False
         #self.spot_detected_time = None
-        self.pub_unpark.publish(Bool(data=False))
+        #self.pub_unpark.publish(Bool(data=False))
 
 
 

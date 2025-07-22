@@ -28,6 +28,8 @@ class ControlParkingNode(DTROS):
 
         self.sub_control = rospy.Subscriber(f"/{self._vehicle_name}/switch/control", Int32, self.cb_mode)
         self.sub_unpark = rospy.Subscriber(f"/{self._vehicle_name}/status/unpark", Bool, self.cb_unpark)
+        self.sub_parking_active = rospy.Subscriber(f"/{self._vehicle_name}/detect/parking_active", Bool, self.cb_parking_state)
+
 
         self.pub_parked = rospy.Publisher(f"/{self._vehicle_name}/status/parked", Bool, queue_size=1)
         self.pub_unparked = rospy.Publisher(f"/{self._vehicle_name}/status/unparked", Bool, queue_size=1)
@@ -35,19 +37,20 @@ class ControlParkingNode(DTROS):
 
     def cb_mode(self, msg):
         if (msg.data == ControlType.Parking.value) and (not self.parking_routine_started):
-            rospy.loginfo("🅿️ Einparkvorgang aktiviert")
+            rospy.loginfo(" Einparkvorgang aktiviert")
             self.active = True
             self.current_step = 0
             self.step_counter = 0
             self.parking_routine_started = True
-        # else:
-        #     self.parking_routine_started = False
-        #     self.active = False            
+            
+    def cb_parking_state(self, msg):
+        if not msg.data:
+            self.parking_routine_started = False       
     
     # Starte ausparkvorgang        
     def cb_unpark(self, msg):
         if msg.data:
-            rospy.loginfo("⬅️ Starte Ausparkvorgang")
+            rospy.loginfo(" Starte Ausparkvorgang")
             self.current_step = 100  # Neue Schrittfolge fürs Ausparken
             self.step_counter = 0
             self.active = True
@@ -55,7 +58,7 @@ class ControlParkingNode(DTROS):
     def step_callback(self, event):
         if not self.active:
             return
-        #rospy.loginfo(f"🅿️ Einparkvorgang Schritt: {self.current_step}, Zähler: {self.step_counter}")
+        #rospy.loginfo(f"Einparkvorgang Schritt: {self.current_step}, Zähler: {self.step_counter}")
         cmd = Twist2DStamped()
 
         # Schrittweise Einparkroutine
@@ -76,7 +79,7 @@ class ControlParkingNode(DTROS):
             if self.step_counter >= 9:
                 self.current_step += 1
                 self.step_counter = 0
-                rospy.loginfo("➡️ Einparkvorgang: 1. Schritt abgeschlossen.")
+                rospy.loginfo("Einparkvorgang: 1. Schritt abgeschlossen.")
 
         elif self.current_step == 2:
             # 2. Schritt: Gegenlenken nach links & rückwärts
@@ -86,7 +89,7 @@ class ControlParkingNode(DTROS):
             if self.step_counter >= 2:
                 self.current_step += 1
                 self.step_counter = 0
-                rospy.loginfo("➡️ Einparkvorgang: 2. Schritt abgeschlossen.")
+                rospy.loginfo("Einparkvorgang: 2. Schritt abgeschlossen.")
 
         elif self.current_step == 3:
             # 3. Schritt: gerade rückwärts
@@ -96,7 +99,7 @@ class ControlParkingNode(DTROS):
             if self.step_counter >= 9:
                 self.current_step += 1
                 self.step_counter = 0
-                rospy.loginfo("➡️ Einparkvorgang: 3. Schritt abgeschlossen.")
+                rospy.loginfo("Einparkvorgang: 3. Schritt abgeschlossen.")
 
         elif self.current_step == 4:
             # 4. Schritt: STOPP
@@ -137,6 +140,8 @@ class ControlParkingNode(DTROS):
         elif self.current_step == 103:
             self.pub_parked.publish(Bool(data=False))  # Eingeparkt = False
             self.pub_unparked.publish(Bool(data=True))  # ✅ Neues Signal
+            self.active = False
+
 
         self.pub_cmd.publish(cmd)
 
