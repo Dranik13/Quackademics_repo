@@ -37,18 +37,18 @@ white:
   vh: 255
   vl: 170
 yellow:
-  # hh: 40
-  # hl: 15
-  # sh: 255
-  # sl: 40
-  # vh: 255
-  # vl: 120
   hh: 40
   hl: 15
   sh: 255
-  sl: 60
+  sl: 40
   vh: 255
-  vl: 130
+  vl: 120
+  # hh: 40
+  # hl: 15
+  # sh: 255
+  # sl: 60
+  # vh: 255
+  # vl: 130
 red:
   hh: 0
   hl: 10

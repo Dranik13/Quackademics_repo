@@ -119,10 +119,10 @@ class SwitchControlNode(DTROS):
             # else:
             #     self.counter2 += 1
 
-            if self.range.range <= 0.2:
-                msg_cmd = Twist2DStamped(v=0, omega = 0)
-                rospy.loginfo("Obstacle detected, stopping the vehicle")
-            elif self.control_mode == 3 or self.control_mode == 4 or self.control_mode == 5:
+            # if self.range.range <= 0.2:
+            #     msg_cmd = Twist2DStamped(v=0, omega = 0)
+            #     rospy.loginfo("Obstacle detected, stopping the vehicle")
+            if self.control_mode == 3 or self.control_mode == 4 or self.control_mode == 5:
                 msg_cmd = self.cmd_value
             else:
                 msg_cmd = self.cmd_value
