@@ -24,12 +24,14 @@ duckie_detect:
   top_right_x: 480
   top_right_y: 250
 white:
-  # hh: 125
-  # hl: 50
+# BEI GELBLICHEM BILD
+  # hh: 255
+  # hl: 0
   # sh: 80
   # sl: 0
   # vh: 255
-  # vl: 172
+  # vl: 180
+# BEI BLAULICHEM BILD
   hh: 180
   hl: 0
   sh: 35
@@ -37,18 +39,20 @@ white:
   vh: 255
   vl: 170
 yellow:
-  hh: 40
-  hl: 15
-  sh: 255
-  sl: 40
-  vh: 255
-  vl: 120
+# BEI GELBLICHEM BILD
   # hh: 40
   # hl: 15
   # sh: 255
-  # sl: 60
+  # sl: 110
   # vh: 255
-  # vl: 130
+  # vl: 150
+# BEI BLAULICHEM BILD
+  hh: 40
+  hl: 15
+  sh: 255
+  sl: 60
+  vh: 255
+  vl: 130
 red:
   hh: 0
   hl: 10
@@ -69,7 +73,7 @@ line_detection_params:
   # Anz. an Mittelliniensegmenten die betrachtet werden 
   num_middle_pts: 7
   # Orientierungspunkt der an die Regelung gesendet wird. Gezählt vom am Fz. nächsten 
-  control_pt_nr: 3
+  control_pt_nr: 2
 search_for_parking_lot:
   look_for_parkinglot: true
   search_range: 50
@@ -81,7 +85,7 @@ debugging_output:
   output_image: true
   mask_white: false
   mask_yellow: false
-  mask_DuckieBot:true
+  mask_DuckieBot: false
 controller:
   max_speed: 0.2
   min_speed_percent: 0.4

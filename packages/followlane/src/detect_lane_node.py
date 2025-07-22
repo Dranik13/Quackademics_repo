@@ -118,10 +118,10 @@ class DetectLaneNode(DTROS):
                 self.obstacle_avoidance_timer_run = False
                 self.obstacle_avoidance_timer = 0
                 self.avoiding_obstacles_mode = False
-        if self.drive_left:
-            print("Fahre Links:")
-        if self.avoiding_obstacles_mode:
-            print("avoiding Obstacle Mode")
+        # if self.drive_left:
+        #     print("Fahre Links:")
+        # if self.avoiding_obstacles_mode:
+        #     print("avoiding Obstacle Mode")
         np_arr = np.frombuffer(image_msg.data, np.uint8)
         cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
         # cv_image_copy = cv_image.copy()
@@ -247,7 +247,7 @@ class DetectLaneNode(DTROS):
                     # search for sideline
                     if 0 <= new_x < width and 0 <= new_y < height and int(mask_white[int(new_y), int(new_x)]) != 0:
                         sideline_pts.append((int(new_x), int(new_y)))
-                        midpoint = (int((new_x + middle_pts[viewed_pt][0]) / 2.0), int((new_y + middle_pts[viewed_pt][1]) / 2.0))
+                        midpoint = (int((new_x + middle_pts[viewed_pt][0]) / 1.95), int((new_y + middle_pts[viewed_pt][1]) / 2.0))
                         desired_centers.append(midpoint)
                         middle_pt_far_enough = True
                         # if midpoint[1] < 190 and middle_pt_far_enough == False:
