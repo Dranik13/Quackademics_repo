@@ -45,7 +45,7 @@ class CrossingIntersectionNode(DTROS):
 
         # Publisher
         self.pub_direction = rospy.Publisher(self._direction_topic, Int32, queue_size=1)
-        self.pub_debug_img = rospy.Publisher(self._debug_img_topic, Image, queue_size=1)
+        #self.pub_debug_img = rospy.Publisher(self._debug_img_topic, Image, queue_size=1)
 
         # Subscriber
         self.sub_image = rospy.Subscriber(self._camera_topic, CompressedImage, self.cbImageCallback, queue_size=1)
@@ -117,8 +117,8 @@ class CrossingIntersectionNode(DTROS):
 
         # Debug-Bild senden (nur wenn Sub vorhanden)
 
-        debug_msg = self.bridge.cv2_to_imgmsg(debug_img, encoding="bgr8")
-        self.pub_debug_img.publish(debug_msg)
+        #debug_msg = self.bridge.cv2_to_imgmsg(debug_img, encoding="bgr8")
+        #self.pub_debug_img.publish(debug_msg)
 
     def choose_random_direction(self, state):
         stop_active = bool(state & self.DIRECTIONS["Stop"])

@@ -28,6 +28,7 @@ class DetectLaneNode(DTROS):
     def __init__(self, node_name):
         # initialize the DTROS parent class
         super(DetectLaneNode, self).__init__(node_name=node_name, node_type=NodeType.VISUALIZATION)
+        self.counter = 0
 
         self.load_conf('packages/followlane/config/detect_lane.yaml')
         self._vehicle_name = os.environ['VEHICLE_NAME']
@@ -52,7 +53,7 @@ class DetectLaneNode(DTROS):
 
         self._bridge = CvBridge()
         self.parking_buffer = deque(maxlen=4)  # Puffer für letzte 10 Ergebnisse
-        self.counter = 0
+        
         self.avoiding_obstacles = False
         self.drive_left = False
         self.obstacle_avoidance_timer = 0
@@ -597,10 +598,10 @@ class DetectLaneNode(DTROS):
         # print("interpolate points: ", interp)
         return interp
       
-        from cv_bridge import CvBridge
-        bridge = CvBridge()
-        ros_img = bridge.cv2_to_imgmsg(bv_img, encoding="bgr8")
-        self.pub_parking_debug.publish(ros_img)
+        # from cv_bridge import CvBridge
+        # bridge = CvBridge()
+        # ros_img = bridge.cv2_to_imgmsg(bv_img, encoding="bgr8")
+        # self.pub_parking_debug.publish(ros_img)
 
     
     def load_conf(self,path):
