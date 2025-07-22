@@ -26,7 +26,7 @@ MOVEMENT_PARAMS = {
 
 class ControlCrossingNode(DTROS):
     def __init__(self, node_name):
-        super(ControlCrossingNode, self).__init__(node_name=node_name, node_type=NodeType.VISUALIZATION)
+        super(ControlCrossingNode, self).__init__(node_name=node_name, node_type=NodeType.GENERIC)
 
         self._vehicle_name = os.environ['VEHICLE_NAME']
 
@@ -46,15 +46,11 @@ class ControlCrossingNode(DTROS):
 
         # Zustand
         self._mode = CrossingMode.Idle
-        self.crossing_blocked = False
-        self.min_box_area = 1500
         self._crossing_active = False
         self._start_time = None
         self._movement = {'v': 0.0, 'omega': 0.0, 'duration': 0.0}
 
-        self._motion_elapsed = 0.0
-        self._last_time = time.time()
-        self._last_box_time = time.time()
+        self.min_box_area = 1000
 
     def cbBoundingBox(self, msg):
         """Callback zur Auswertung der Bounding Boxen von Duckiebots im Kreuzungsbereich."""
@@ -74,15 +70,6 @@ class ControlCrossingNode(DTROS):
             if area >= self.min_box_area:
                 valid_boxes += 1
 
-        if valid_boxes > 0:
-            self.crossing_blocked = True
-            rospy.loginfo(f"[Crossing] {valid_boxes} große BoundingBox(en) erkannt – Kreuzung blockiert.")
-        else:
-            self._last_box_time = time.time()
-            if self.crossing_blocked:
-                rospy.loginfo("[Crossing] Kreuzung wieder frei.")
-            self.crossing_blocked = False
-
     def cbCrossingFlags(self, msg):
         """Callback bei Empfang eines neuen Richtungsbits."""
         flags = msg.data
@@ -93,7 +80,6 @@ class ControlCrossingNode(DTROS):
             self._movement = MOVEMENT_PARAMS[self._mode]
             self._start_time = time.time()
             self._crossing_active = True
-
             self.pub_crossing_enabled.publish(Bool(data=True))
             rospy.loginfo(f"[Crossing] Startet Manöver: {self._mode.name}")
         else:
@@ -116,64 +102,41 @@ class ControlCrossingNode(DTROS):
             return CrossingMode.Idle
 
     def run(self):
-        rate = rospy.Rate(10)  # 10 Hz → Schleife läuft 10x pro Sekunde
-
-        self._motion_elapsed = 0.0
-        self._last_time = time.time()
-
+        rate = rospy.Rate(10)  # 10 Hz
         while not rospy.is_shutdown():
             twist = Twist2DStamped()
-            current_time = time.time()
-            delta_time = current_time - self._last_time
-            self._last_time = current_time
-
-            # Timeout-Prüfung für crossing_blocked (1 Sekunde ohne neue Box → frei)
-            if time.time() - self._last_box_time > 1.0:
-                if self.crossing_blocked:
-                    rospy.loginfo("[Crossing] Timeout – Kreuzung wird als frei angenommen.")
-                self.crossing_blocked = False
-
-            # 🚦 Nur wenn ein gültiger Modus aktiv ist
-            if self._mode != CrossingMode.Idle:
+            if self._mode != CrossingMode.Idle:              
                 if self._crossing_active:
-                    if self.crossing_blocked:
-                        # Kreuzung ist blockiert → Bewegung pausiert
-                        rospy.loginfo_throttle(2.0, "[Crossing] Warten – Kreuzung blockiert.")
+                    elapsed = time.time() - self._start_time if self._start_time else 0
+                    
+                    # Wartephase von 2 Sekunden mit Stillstand
+                    if elapsed < 3.0:
                         twist.v = 0.0
                         twist.omega = 0.0
                     else:
-                        # Kreuzung ist frei → Zeit fortschreiben und ggf. fahren
-                        self._motion_elapsed += delta_time
+                        # Danach wird die Bewegung ausgeführt
+                        twist.v = self._movement['v']
+                        twist.omega = self._movement['omega']
+                    
+                    duration = self._movement['duration']
 
-                        if self._motion_elapsed < 2.0:
-                            # Sicherheitswartezeit (Stillstand)
-                            twist.v = 0.0
-                            twist.omega = 0.0
-                        else:
-                            # ▶️ Aktives Manöver ausführen
-                            twist.v = self._movement['v']
-                            twist.omega = self._movement['omega']
-
-                    # Prüfen, ob das Manöver vollständig abgeschlossen ist
-                    total_duration = 2.0 + self._movement['duration']
-                    if self._motion_elapsed >= total_duration:
+                    # Wenn die Gesamtzeit (inkl. 2 Sekunden Wartezeit) abgelaufen ist, beende das Manöver
+                    if elapsed >= duration + 3.0:
                         rospy.loginfo("[Crossing] Manöver abgeschlossen.")
                         self._crossing_active = False
                         self._mode = CrossingMode.Idle
                         self.pub_crossing_enabled.publish(Bool(data=False))
                         twist.v = 0.0
-                        twist.omega = 0.0
+                        twist.omega = 0.0   
                 else:
-                    # 💤 Kein aktives Manöver → Stillstand
                     twist.v = 0.0
                     twist.omega = 0.0
-
-                # Aktuellen Bewegungsbefehl senden
                 self.pub_cmd_vel.publish(twist)
 
             rate.sleep()
 
-if __name__ == '_main_':
+
+if __name__ == '__main__':
     # rospy.init_node('control_crossing_node')
     node = ControlCrossingNode(node_name='control_crossing_node')
     node.run()

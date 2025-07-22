@@ -81,7 +81,7 @@ debugging_output:
   output_image: true
   mask_white: true
   mask_yellow: true
-  
+
 controller:
   max_speed: 0.2
   min_speed_percent: 0.4
