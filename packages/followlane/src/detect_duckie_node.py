@@ -72,7 +72,7 @@ class DetectDuckieNode(DTROS):
 
     def is_object_in_path(self,results, img):
         object_in_path = False
-
+        self.boxes_msg.data = []
         # Erstelle eine Maske aus den Punkten, um den Bereich zu markieren
         mask = np.zeros(img.shape[:2], dtype=np.uint8)
         cv2.fillPoly(mask, [self.pts1.astype(np.int32)], 255)

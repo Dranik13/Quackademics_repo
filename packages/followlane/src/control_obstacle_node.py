@@ -54,11 +54,11 @@ class ControlObstacleNode(DTROS):
             
             # print("self._duckie_detected: ", self._duckie_detected)
             if self._control_mode == ObstacleMode.Spin:
-                twist = Twist2DStamped(v=0, omega=3)
+                twist = Twist2DStamped(v=0, omega=1)
                 self.pub_cmd_vel.publish(twist)
             
             if self._control_mode == ObstacleMode.Move:
-                twist = Twist2DStamped(v=0.2, omega=0)
+                twist = Twist2DStamped(v=0.1, omega=0)
                 self.pub_cmd_vel.publish(twist)
                 self._counter += 1
             
@@ -67,7 +67,7 @@ class ControlObstacleNode(DTROS):
             else:
                 self._control_mode = ObstacleMode.Move
             
-            if self._counter >= 8:
+            if self._counter >= 12:
                 self._control_mode = ObstacleMode.Stop
                 self.enable = False
                 twist = Twist2DStamped(v=0.0, omega=0)

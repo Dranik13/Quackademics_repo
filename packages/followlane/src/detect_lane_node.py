@@ -29,41 +29,19 @@ class DetectLaneNode(DTROS):
         # initialize the DTROS parent class
         super(DetectLaneNode, self).__init__(node_name=node_name, node_type=NodeType.VISUALIZATION)
 
-        self.load_conf('packages/followlane/config/detect_lane.yaml')
-        self._vehicle_name = os.environ['VEHICLE_NAME']
-        self._camera_topic = f"/{self._vehicle_name}/camera_node/image/compressed"
-        self._obstacle_topic = f"/{self._vehicle_name}/obstacle/enabled"
-        self._bb_duckiebots = f"/{self._vehicle_name}/detect/duckiebot_box"
-        # self._bb_duckies = f"/{self._vehicle_name}/detect/duckie_boxes"
-
-        self.sub_obstacle_avoidance = rospy.Subscriber(self._obstacle_topic, Bool, self.checkObstacleAvoidance, queue_size = 1)
-        self.sub_image_original = rospy.Subscriber(self._camera_topic, CompressedImage, self.cbFindLane, queue_size = 1)
-
-        self.sub_bb_duckiebots = rospy.Subscriber(self._bb_duckiebots, Float64MultiArray, self.cbBBDuckiebots, queue_size = 1)
-        # self.sub_bb_duckies = rospy.Subscriber(self._bb_duckies, Float64MultiArray, self.cbBBDuckies, queue_size = 1)
-
-        self.pub_lane = rospy.Publisher(f'/{self._vehicle_name}/detect/lane', Float64, queue_size = 1)
-        self.pub_orientation = rospy.Publisher(f'/{self._vehicle_name}/detect/orientation', Float64, queue_size=1)
-        
-        self.pub_parking_spot = rospy.Publisher(f'/{self._vehicle_name}/detect/parking_spot', Bool, queue_size=1)
-        self.pub_parking_debug = rospy.Publisher(f"/{self._vehicle_name}/debug/parking_img", Image, queue_size=1)
-        self.pub_parking_roi_px = rospy.Publisher(f"/{self._vehicle_name}/detect/parking_roi_px", Float64MultiArray, queue_size=1)
-
-
         self._bridge = CvBridge()
         self.parking_buffer = deque(maxlen=4)  # Puffer für letzte 10 Ergebnisse
         self.counter = 0
         self.avoiding_obstacles = False
-        self.drive_left = False
+        self.avoiding_obstacles_mode = False
         self.obstacle_avoidance_timer = 0
         self.obstacle_avoidance_timer_run = False
-
-        self.avoidance_cooldown = 0
-        self.cooldown_after_obstacle_avoidance = True
+        self.drive_left = False
+        
         self.roi_line_msg = Float64MultiArray()
 
         self.bb_duckiebots = Float64MultiArray()
-        # self.bb_duckies = Float64MultiArray()
+        self.bb_duckies = Float64MultiArray()
 
         self.center_history = deque(maxlen=5)
 
@@ -74,6 +52,26 @@ class DetectLaneNode(DTROS):
             [0.0, -0.8191520442889918, 312.8728066433488]
         ])
         self.bev_inv_matrix = np.linalg.inv(self.bev_transform_matrix)
+        
+        self.load_conf('packages/followlane/config/detect_lane.yaml')
+        self._vehicle_name = os.environ['VEHICLE_NAME']
+        self._camera_topic = f"/{self._vehicle_name}/camera_node/image/compressed"
+        self._obstacle_topic = f"/{self._vehicle_name}/obstacle/enabled"
+        self._bb_duckiebots = f"/{self._vehicle_name}/detect/duckiebot_box"
+        self._bb_duckies = f"/{self._vehicle_name}/detect/duckie_boxes"
+
+        self.sub_obstacle_avoidance = rospy.Subscriber(self._obstacle_topic, Bool, self.checkObstacleAvoidance, queue_size = 1)
+        self.sub_image_original = rospy.Subscriber(self._camera_topic, CompressedImage, self.cbFindLane, queue_size = 1)
+
+        self.sub_bb_duckiebots = rospy.Subscriber(self._bb_duckiebots, Float64MultiArray, self.cbBBDuckiebots, queue_size = 1)
+        self.sub_bb_duckies = rospy.Subscriber(self._bb_duckies, Float64MultiArray, self.cbBBDuckies, queue_size = 1)
+
+        self.pub_lane = rospy.Publisher(f'/{self._vehicle_name}/detect/lane', Float64, queue_size = 1)
+        self.pub_orientation = rospy.Publisher(f'/{self._vehicle_name}/detect/orientation', Float64, queue_size=1)
+        
+        self.pub_parking_spot = rospy.Publisher(f'/{self._vehicle_name}/detect/parking_spot', Bool, queue_size=1)
+        self.pub_parking_debug = rospy.Publisher(f"/{self._vehicle_name}/debug/parking_img", Image, queue_size=1)
+        self.pub_parking_roi_px = rospy.Publisher(f"/{self._vehicle_name}/detect/parking_roi_px", Float64MultiArray, queue_size=1)
 
     def transformToBirdsView(self, img):
         img = img.copy()
@@ -86,14 +84,15 @@ class DetectLaneNode(DTROS):
                                flags=cv2.INTER_CUBIC | cv2.WARP_INVERSE_MAP)
     
     def checkObstacleAvoidance(self, avoiding_obstacles_msg):
-        #print("msg: ", avoiding_obstacles_msg.data)
+        # print("msg: ", avoiding_obstacles_msg.data)
         self.avoiding_obstacles = avoiding_obstacles_msg.data
 
     def cbBBDuckiebots(self, msg):
         self.bb_duckiebots = msg
 
-    # def cbBBDuckies(self, msg):
-    #     self.bb_duckies = msg
+    def cbBBDuckies(self, msg):
+        self.bb_duckies = msg
+        # print("bb_duckies: ", self.bb_duckies)
 
     def cbFindLane(self, image_msg):
         # 10 HZ -> 0.1 second
@@ -106,25 +105,23 @@ class DetectLaneNode(DTROS):
             self.drive_left = True
             self.obstacle_avoidance_timer_run = True
             self.obstacle_avoidance_timer = 0
-            self.cooldown_after_obstacle_avoidance = False
+            self.avoiding_obstacles_mode = True
 
         if self.obstacle_avoidance_timer_run == True:
             self.obstacle_avoidance_timer += 1
-            # print("timer: ", self.obstacle_avoidance_timer / 10)
-                                        # 2 seconds         
-            if self.obstacle_avoidance_timer >= 40:
+            # print("timer: ", self.obstacle_avoidance_timer / 10, " avoiding obstacle mode: ", self.avoiding_obstacles_mode)
+            # drive right again after 2 Seconds        
+            if self.obstacle_avoidance_timer >= 20 and self.drive_left:
+                self.drive_left = False
+            # stop timer and check distance to yellow line again after 8 secs.
+            if self.obstacle_avoidance_timer >= 120:
                 self.obstacle_avoidance_timer_run = False
                 self.obstacle_avoidance_timer = 0
-                self.avoidance_cooldown = True
-        
-        if self.cooldown_after_obstacle_avoidance == False and self.obstacle_avoidance_timer_run == False:
-            self.obstacle_avoidance_timer += 1
-            print("Timer: ", self.obstacle_avoidance_timer, " Betrachte Linie: ", self.cooldown_after_obstacle_avoidance)
-
-
-        if self.obstacle_avoidance_timer >= 80:
-            self.cooldown_after_obstacle_avoidance = True
-
+                self.avoiding_obstacles_mode = False
+        if self.drive_left:
+            print("Fahre Links:")
+        if self.avoiding_obstacles_mode:
+            print("avoiding Obstacle Mode")
         np_arr = np.frombuffer(image_msg.data, np.uint8)
         cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
         # cv_image_copy = cv_image.copy()
@@ -136,17 +133,18 @@ class DetectLaneNode(DTROS):
         #     bottom_right_corner = (result[2], result[3])
         #     cv2.rectangle(cv_image_copy, top_left_corner, bottom_right_corner, -1)
         Black = (0,0,0)
-
         if self.bb_duckiebots is not None and len(self.bb_duckiebots.data) >=4:
-            top_left_corner = (int(self.bb_duckiebots.data[0]), int(self.bb_duckiebots.data[1]))
-            bottom_right_corner = (int(self.bb_duckiebots.data[2]), int(self.bb_duckiebots.data[3]))
-            cv2.rectangle(cv_image, top_left_corner, bottom_right_corner,Black, -1)
+            for i in range(0, len(self.bb_duckiebots.data), 4):
+                top_left_corner = (int(self.bb_duckiebots.data[i]), int(self.bb_duckiebots.data[i+1]))
+                bottom_right_corner = (int(self.bb_duckiebots.data[i+2]), int(self.bb_duckiebots.data[i+3]))
+                cv2.rectangle(cv_image, top_left_corner, bottom_right_corner,Black, -1)
             # cv2.imshow("Rechteck",cv_image_copy)
 
-        # if self.bb_duckies is not None and len(self.bb_duckies.data) >=4:
-        #     top_left_corner = (int(self.bb_duckies.data[0]), int(self.bb_duckies.data[1]))
-        #     bottom_right_corner = (int(self.bb_duckies.data[2]), int(self.bb_duckies.data[3]))
-        #     cv2.rectangle(cv_image, top_left_corner, bottom_right_corner,Black, -1)
+        if self.bb_duckies is not None and len(self.bb_duckies.data) >=4:
+            for i in range(0, len(self.bb_duckies.data), 4):
+                top_left_corner = (int(self.bb_duckies.data[i]), int(self.bb_duckies.data[i+1]))
+                bottom_right_corner = (int(self.bb_duckies.data[i+2]), int(self.bb_duckies.data[i+3]))
+                cv2.rectangle(cv_image, top_left_corner, bottom_right_corner, Black, -1)
 
         bv_img = self.transformToBirdsView(cv_image)
         bv_img = bv_img[self.look_distance:, :]
@@ -220,8 +218,7 @@ class DetectLaneNode(DTROS):
         previous_dx = 0
         previous_dy = 0
         # search for right line if a middle line was found
-        if len(middle_pts) >= 2 and self.avoiding_obstacles == False and self.obstacle_avoidance_timer_run == False:
-            self.drive_left = False
+        if len(middle_pts) >= 2 and self.drive_left == False:
             viewed_pt = 0
 
             while viewed_pt <= len(middle_pts) -2:
@@ -301,7 +298,7 @@ class DetectLaneNode(DTROS):
 
         if middle_pt_far_enough == False:
             red_line_detected = checkForRedLine(original_bv_img)
-            if red_line_detected and self.cooldown_after_obstacle_avoidance == True:
+            if red_line_detected and self.avoiding_obstacles_mode == False:
                 hard_centers = []
                 hard_centers.append((650, 250))
                 desired_centers = hard_centers

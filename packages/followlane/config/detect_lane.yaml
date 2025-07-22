@@ -37,18 +37,18 @@ white:
   vh: 255
   vl: 170
 yellow:
-  # hh: 40
-  # hl: 15
-  # sh: 255
-  # sl: 40
-  # vh: 255
-  # vl: 120
   hh: 40
   hl: 15
   sh: 255
-  sl: 60
+  sl: 40
   vh: 255
-  vl: 130
+  vl: 120
+  # hh: 40
+  # hl: 15
+  # sh: 255
+  # sl: 60
+  # vh: 255
+  # vl: 130
 red:
   hh: 0
   hl: 10
@@ -77,7 +77,7 @@ search_for_parking_lot:
   max_y_diff: 70
 debugging_output:
   line_coordinates: false
-  input_image: false
+  input_image: true
   output_image: false
   mask_white: false
   mask_yellow: false
