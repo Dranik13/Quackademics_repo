@@ -27,7 +27,7 @@ class DetectDuckieBot(DTROS):
         self.load_conf('packages/followlane/config/detect_lane.yaml')
         self.image_lock = Lock()
         # Publisher
-        self.pub_image = rospy.Publisher(f"/{self._vehicle_name}/detect/duckie_bot/image", Image, queue_size=1)
+        #self.pub_image = rospy.Publisher(f"/{self._vehicle_name}/detect/duckie_bot/image", Image, queue_size=1)
         self.pub_parking_free = rospy.Publisher(f"/{self._vehicle_name}/parking/free", Bool, queue_size=1)
         self.pub_duckie_box = rospy.Publisher(f"/{self._vehicle_name}/detect/duckiebot_box", Float64MultiArray, queue_size=1)
 
@@ -250,9 +250,9 @@ class DetectDuckieBot(DTROS):
                     
         cv2.polylines(image, [self.static_roi_polygon.astype(np.int32).reshape((-1, 1, 2))], isClosed=True, color=(0, 0, 255), thickness=2)
         # Bild publishen
-        if self.conf['debugging_output']['input_image'] or True:
-            ros_img = self.bridge.cv2_to_imgmsg(image, encoding="bgr8")
-            self.pub_image.publish(ros_img)
+        # if self.conf['debugging_output']['input_image'] or True:
+        #     ros_img = self.bridge.cv2_to_imgmsg(image, encoding="bgr8")
+        #     self.pub_image.publish(ros_img)
         self.pub_duckie_box.publish(self.boxes_msg)
         self.pub_parking_free.publish(Bool(data=not self.occupied_parkingspot))
         if self.occupied_parkingspot:

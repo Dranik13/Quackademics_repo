@@ -70,21 +70,60 @@ class WhiteYellowCalibrationNode(DTROS):
                 rate.sleep()
                 continue
 
+            # vals = self.get_trackbar_values()
+            # hsv = cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV)
+            # lower = (vals['hl'], vals['sl'], vals['vl'])
+            # upper = (vals['hh'], vals['sh'], vals['vh'])
+            # mask = cv2.inRange(hsv, lower, upper)
+
+            # output = self.image.copy()
+            # if self.current_mode == 'gelb':
+            #     output[mask > 0] = (0, 255, 255)
+            # elif self.current_mode == 'red':
+            #     output[mask > 0] = (0, 0, 255)
+            # else:
+            #     output[mask > 0] = (255, 255, 255)
+
+            # cv2.imshow(self._window, output)
+
+            # Aktuelle HSV-Schwellen aus den Slidern
             vals = self.get_trackbar_values()
-            hsv = cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV)
             lower = (vals['hl'], vals['sl'], vals['vl'])
             upper = (vals['hh'], vals['sh'], vals['vh'])
-            mask = cv2.inRange(hsv, lower, upper)
 
+            # Konvertiere RGB → HSV
+            hsv = cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV)
+
+            # --- Maske ohne CLAHE ---
             output = self.image.copy()
-            if self.current_mode == 'gelb':
-                output[mask > 0] = (0, 255, 255)
-            elif self.current_mode == 'red':
-                output[mask > 0] = (0, 0, 255)
-            else:
-                output[mask > 0] = (255, 255, 255)
+            mask_normal = cv2.inRange(hsv, lower, upper)
 
-            cv2.imshow(self._window, output)
+            if self.current_mode == 'gelb':
+                output[mask_normal > 0] = (0, 255, 255)
+            elif self.current_mode == 'red':
+                output[mask_normal > 0] = (0, 0, 255)
+            else:
+                output[mask_normal > 0] = (255, 255, 255)
+
+            cv2.imshow("Maske: Ohne CLAHE", output)
+
+            # --- Maske mit CLAHE ---
+            h, s, v = cv2.split(hsv)
+            clahe = cv2.createCLAHE(clipLimit=1.0, tileGridSize=(16 , 16))
+            v_clahe = clahe.apply(v)
+            hsv_clahe = cv2.merge((h, s, v_clahe))
+            mask_clahe = cv2.inRange(hsv_clahe, lower, upper)
+
+            output_clahe = self.image.copy()
+            if self.current_mode == 'gelb':
+                output_clahe[mask_clahe > 0] = (0, 255, 255)
+            elif self.current_mode == 'red':
+                output_clahe[mask_clahe > 0] = (0, 0, 255)
+            else:
+                output_clahe[mask_clahe > 0] = (255, 255, 255)
+            
+            cv2.imshow("Maske: Mit CLAHE", output_clahe)
+
 
             key = cv2.waitKey(1) & 0xFF
             if key == ord('s'):
