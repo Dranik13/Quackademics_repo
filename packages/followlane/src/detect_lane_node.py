@@ -289,7 +289,12 @@ class DetectLaneNode(DTROS):
             if white_contours:
                 middle_pt_far_enough = True
                 # find lowest contur (highest y-Wert)
-                lowest_contour = max(white_contours, key=lambda c: cv2.boundingRect(c)[1] + cv2.boundingRect(c)[3])
+                lowest_contour = max(
+                white_contours,
+                key=lambda c: (
+                    cv2.boundingRect(c)[1] + cv2.boundingRect(c)[3],  # y + h (unterste Kante)
+                    cv2.boundingRect(c)[0] + cv2.boundingRect(c)[2]   # x + w (rechteste Kante)
+                ))
                 cx, cy = calcMiddlePtOfContours(lowest_contour)
 
                 if self.drive_left:
