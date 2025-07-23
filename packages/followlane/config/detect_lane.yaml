@@ -15,14 +15,14 @@ lane_image:
   top_right_x: 640
   top_right_y: 180
 duckie_detect:
-  bottom_left_x: 680
-  bottom_left_y: 480
-  bottom_right_x: 50
-  bottom_right_y: 480
   top_left_x: 220
   top_left_y: 250
   top_right_x: 480
   top_right_y: 250
+  bottom_right_x: 680
+  bottom_right_y: 480
+  bottom_left_x: 50
+  bottom_left_y: 480
 white:
 # BEI GELBLICHEM BILD
   # hh: 255
@@ -85,7 +85,7 @@ debugging_output:
   output_image: true
   mask_white: false
   mask_yellow: false
-  mask_DuckieBot: false
+  input_mask_DuckieBot: false
 controller:
   max_speed: 0.2
   min_speed_percent: 0.4

@@ -18,8 +18,8 @@ class CrossingMode(Enum):
 
 # Bewegungsparameter für jeden Modus
 MOVEMENT_PARAMS = {
-    CrossingMode.TurnRight:    {'v': 0.5,  'omega': -2.0, 'duration': 1.0},
-    CrossingMode.TurnLeft:     {'v': 0.5,  'omega': 1.5,  'duration': 2.0},
+    CrossingMode.TurnRight:    {'v': 0.5,  'omega': -2.0, 'duration': 1.5},
+    CrossingMode.TurnLeft:     {'v': 0.5,  'omega': 1.5,  'duration': 3.0},
     CrossingMode.GoStraight:   {'v': 0.25, 'omega': 0.0,  'duration': 2.0},
 }
 
