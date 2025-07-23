@@ -50,8 +50,8 @@ class ParkingManagerNode(DTROS):
 
  
     def cb_parking_spot(self, msg):
-        rospy.loginfo(f"Parkplatz erkannt: {msg.data}, Parkplatz aktiv: {self.parking_started} , Parkplatz belegt: {self.parking_spot_occupied }")
-        if msg.data and not self.parking_started and not self.cb_parking_occupied:
+        #rospy.loginfo(f"Parkplatz erkannt: {msg.data}, Parkplatz aktiv: {self.parking_started} , Parkplatz belegt: {self.parking_spot_occupied }")
+        if msg.data and not self.parking_started and not self.parking_spot_occupied :
             rospy.loginfo("Parkplatz erkannt. Starte PARKING-Modus sofort.")
             self.start_parking()
 
@@ -62,7 +62,7 @@ class ParkingManagerNode(DTROS):
     def start_parking(self):
         if not self.parking_started:
             rospy.loginfo("Verzögertes Einparken in 1 Sekunde geplant...")
-            rospy.Timer(rospy.Duration(2.0), self._delayed_start_parking, oneshot=True)
+            rospy.Timer(rospy.Duration(2.1), self._delayed_start_parking, oneshot=True)
             self.parking_started = True  # Schon jetzt setzen, damit keine Dopplung entsteht
 
     def _delayed_start_parking(self, event):
