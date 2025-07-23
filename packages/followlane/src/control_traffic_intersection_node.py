@@ -54,6 +54,7 @@ class ControlCrossingNode(DTROS):
         self._crossing_active = False
         self._start_time = None
         self._movement = {'v': 0.0, 'omega': 0.0, 'duration': 0.0}
+        self.timestamp = 0
 
 
         # Blinken 
@@ -62,7 +63,7 @@ class ControlCrossingNode(DTROS):
         self.blink_timer = rospy.Timer(rospy.Duration(0.5), self.blink_callback)
 
         self._wait_for_boxes = False
-        self.min_box_area = 3000
+        self.min_box_width = 200
         self.valid_boxes_coords = []
 
 
@@ -82,11 +83,9 @@ class ControlCrossingNode(DTROS):
         for i in range(0, len(data), 4):
             x1, y1, x2, y2 = data[i:i+4]
             width = abs(x2 - x1)
-            height = abs(y2 - y1)
-            area = width * height
 
             self.valid_boxes_coords = []
-            if area >= self.min_box_area:
+            if width >= self.min_box_width:
                 valid_boxes += 1
                 self.valid_boxes_coords.append((x1, y1, x2, y2))
 
@@ -111,7 +110,6 @@ class ControlCrossingNode(DTROS):
             self._movement = {'v': 0.0, 'omega': 0.0, 'duration': 0.0}
             self.pub_crossing_enabled.publish(Bool(data=False))
             self._mode = CrossingMode.Idle
-            self.set_default_lights()
 
     def determine_mode(self, flags):
         """Bitmaske auswerten → konkrete Fahraktion bestimmen."""
@@ -181,19 +179,6 @@ class ControlCrossingNode(DTROS):
         ]
         self.pub_blinken.publish(self.blinking)
 
-    def set_default_lights(self):
-        # rospy.loginfo("[Crossing] Setze Standardbeleuchtung.")
-        self.blinking.rgb_vals = [
-            ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0),  # Weiß Vorne Links
-            ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0),  # Rot Hinten Rechts
-            ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0),  # Weiß Vorne Rechts
-            ColorRGBA(r=0.0, g=1.0, b=0.0, a=1.0),  # Grün
-            ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0),  # Rot Hinten Links
-        ]
-        self.pub_blinken.publish(self.blinking)
-
-        
-
     def run(self):
         rate = rospy.Rate(10)  # 10 Hz
         while not rospy.is_shutdown():
@@ -206,41 +191,44 @@ class ControlCrossingNode(DTROS):
                         twist.v = 0.0
                         twist.omega = 0.0
                     else:
-                        # # Berechne Mittelpunkt der BBs
-                        # BB_middlepoints = []
-                        # for (x1, y1, x2, y2) in self.valid_boxes_coords:
-                        #     mx = (x1 + x2) / 2.0
-                        #     my = (y1 + y2) / 2.0
-                        #     BB_middlepoints.append((mx, my))
+                        # Berechne Mittelpunkt der BBs
+                        BB_middlepoints = []
+                        for (x1, y1, x2, y2) in self.valid_boxes_coords:
+                            mx = (x1 + x2) / 2.0
+                            my = (y1 + y2) / 2.0
+                            BB_middlepoints.append((mx, my))
 
-                        # # "Switch-Case" für CrossingMode
-                        # if self._mode == CrossingMode.TurnRight:
-                        #     # Brauche auf niemanden zu achten
-                        #     allow_crossing = True
-                        # elif self._mode == CrossingMode.GoStraight:
-                        #     # Betrachte rechts
-                        #     # Prüfe, ob ein Mittelpunkt im rechten Bilddrittel liegt
-                        #     allow_crossing = not any(mx > (2/3) * 640 for (mx, my) in BB_middlepoints)
-                        # elif self._mode == CrossingMode.TurnLeft:
-                        #     # Betrachte rechts und vorne
-                        #     allow_crossing = not any((640 / 3) < mx <= (2 * 640 / 3) or mx > (2 * 640 / 3) for (mx, my) in BB_middlepoints)
-                        # else:
-                        #     allow_crossing = False
+                        # "Switch-Case" für CrossingMode
+                        if self._mode == CrossingMode.TurnRight:
+                            # Brauche auf niemanden zu achten
+                            allow_crossing = True
+                        elif self._mode == CrossingMode.GoStraight:
+                            # Betrachte rechts
+                            # Prüfe, ob ein Mittelpunkt im rechten Bilddrittel liegt
+                            allow_crossing = not any(mx > (2/3) * 640 for (mx, my) in BB_middlepoints)
+                        elif self._mode == CrossingMode.TurnLeft:
+                            # Betrachte rechts und vorne
+                            allow_crossing = not any((640 / 3) < mx <= (2 * 640 / 3) or mx > (2 * 640 / 3) for (mx, my) in BB_middlepoints)
+                        else:
+                            allow_crossing = False
                         
-                        # # Führe Bewegung aus
-                        # if allow_crossing:
-                        twist.v = self._movement['v']
-                        twist.omega = self._movement['omega']
+                        # Führe Bewegung aus
+                        if allow_crossing:
+                            twist.v = self._movement['v']
+                            twist.omega = self._movement['omega']
+                            self.timestamp = elapsed
+                        else:
+                            twist.v = 0.0
+                            twist.omega = 0.0
                     
                     duration = self._movement['duration']
 
                     # Wenn die Gesamtzeit (inkl. 2 Sekunden Wartezeit) abgelaufen ist, beende das Manöver
-                    if elapsed >= duration + 3.0:
+                    if elapsed >= duration + self.timestamp and allow_crossing == True:
                         rospy.loginfo("[Crossing] Manöver abgeschlossen.")
                         self._crossing_active = False
                         self._mode = CrossingMode.Idle
                         self.pub_crossing_enabled.publish(Bool(data=False))
-                        self.set_default_lights()
                         twist.v = 0.0
                         twist.omega = 0.0
                         allow_crossing = False
