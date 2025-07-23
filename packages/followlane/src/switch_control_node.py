@@ -66,11 +66,13 @@ class SwitchControlNode(DTROS):
             rospy.logdebug("[Switch Control] Parking aktiv – Duckie detection ignoriert.")
             return  # Bei aktivem Parking keine Duckie-Reaktion
         if msg.data:
-            # if self.state != ControlType.Obstacle:
-            #     rospy.loginfo("[Switch Control] Duckie erkannt. Wechsle zu Obstacle-Modus.")
+            if self.state != ControlType.Obstacle:
+                rospy.loginfo("[Switch Control] Duckie erkannt. Wechsle zu Obstacle-Modus.")
             self.state = ControlType.Obstacle
         elif not self._Obstacle_enabled:
             # rospy.loginfo("[Switch Control] Kein Duckie mehr und Obstacle deaktiviert. Wechsle zu Lane-Modus.")
+            if self.state != ControlType.Lane:
+                rospy.loginfo("[Switch Control] Spur erkannt. Wechsle zu Lane-Modus.")
             self.state = ControlType.Lane
         self.obstacle_detected = msg.data
         self.update_state()
@@ -80,6 +82,8 @@ class SwitchControlNode(DTROS):
         # rospy.loginfo(f"[Callback] Lane detected: {self.lane_detected}")
         if self.lane_detected and not self._Obstacle_enabled and not self._crossing_enabled and not self._parking_active:
             # rospy.loginfo("[Switch Control] Spur erkannt. Wechsle zu Lane-Modus.")
+            if self.state != ControlType.Lane:
+                rospy.loginfo("[Switch Control] Spur erkannt. Wechsle zu Lane-Modus.")
             self.state = ControlType.Lane
         self.update_state()
 
@@ -113,8 +117,8 @@ class SwitchControlNode(DTROS):
 
         # Höchste Priorität: Parking-Modus
         if self._parking_active:
-            # if self.state != ControlType.Parking:
-            #     rospy.loginfo("[Switch Control] Parking aktiviert Wechsel in Parking-Modus.")
+            if self.state != ControlType.Parking:
+                rospy.loginfo("[Switch Control] Parking aktiviert Wechsel in Parking-Modus.")
             self.state = ControlType.Parking
             return
 
@@ -125,19 +129,21 @@ class SwitchControlNode(DTROS):
         if self.state == ControlType.Intersection_Waiting and self.pending_direction is not None:
             # rospy.loginfo("[Switch Control] Warte auf Kreuzung und Richtung bekannt. Wechsel zu Intersection_Active.")
             self.send_direction()
+            if self.state != ControlType.Intersection_Active:
+                rospy.loginfo("[Switch Control] Wechsle in Intersection_Active.")
             self.state = ControlType.Intersection_Active
             # rospy.loginfo("[Switch Control] Wechsle in Intersection_Active.")
             return
 
         if self.obstacle_detected:
-            # if self.state != ControlType.Obstacle:
-                # rospy.loginfo("[Switch Control] Obstacle erkannt. Wechsle zu Obstacle-Modus.")
+            if self.state != ControlType.Obstacle:
+                rospy.loginfo("[Switch Control] Obstacle erkannt. Wechsle zu Obstacle-Modus.")
             self.state = ControlType.Obstacle
             return
 
         if self.lane_detected and not self._Obstacle_enabled:
-            # if self.state != ControlType.Lane:
-                # rospy.loginfo("[Switch Control] Spur erkannt. Wechsle zu Lane-Modus.")
+            if self.state != ControlType.Lane:
+                rospy.loginfo("[Switch Control] Spur erkannt. Wechsle zu Lane-Modus.")
             self.state = ControlType.Lane
             return
         rospy.logdebug("[Switch Control] Kein Zustandswechsel notwendig.")

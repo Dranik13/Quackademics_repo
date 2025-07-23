@@ -60,10 +60,10 @@ class DetectDuckieBot(DTROS):
 
         # Fahrbereich
         self.static_roi_polygon = np.array([
-                (0, 480),
+                (50, 480),
                 (640, 480),
-                (440, 300),
-                (200, 300)
+                (420, 330),
+                (260, 330)
             ])
         # Transformation Matrix für Birdview
         self.H_birdview = np.array([

@@ -37,7 +37,7 @@ class ControlCrossingNode(DTROS):
         self._cmd_vel_topic = f"/{self._vehicle_name}/control/cmd"
         self._crossing_enabled_topic = f"/{self._vehicle_name}/crossing/enabled"
         self._direction_topic = f"/{self._vehicle_name}/intersection_mode/direction"
-        self._duckiebot_topic = f"/{self._vehicle_name}/detect/duckie_boxes"
+        self._duckiebot_topic = f"/{self._vehicle_name}/detect/duckiebot_box"
         self._blinken_topic = f"/{self._vehicle_name}/led_emitter_node/led_pattern"
 
         # Publisher
@@ -55,6 +55,7 @@ class ControlCrossingNode(DTROS):
         self._start_time = None
         self._movement = {'v': 0.0, 'omega': 0.0, 'duration': 0.0}
         self.timestamp = 0
+        self.allow_crossing = False
 
 
         # Blinken 
@@ -63,15 +64,15 @@ class ControlCrossingNode(DTROS):
         self.blink_timer = rospy.Timer(rospy.Duration(0.5), self.blink_callback)
 
         self._wait_for_boxes = False
-        self.min_box_width = 200
+        self.min_box_heigth = 60
         self.valid_boxes_coords = []
 
 
     def cbBoundingBox(self, msg):
         """Callback zur Auswertung der Bounding Boxen von Duckiebots im Kreuzungsbereich."""
 
-        if not self._wait_for_boxes:
-            return
+        # if not self._wait_for_boxes:
+        #     return
         
         data = msg.data
 
@@ -79,15 +80,15 @@ class ControlCrossingNode(DTROS):
             rospy.logwarn(f"[Crossing] Ungültige BoundingBox-Datenlänge: {len(data)}")
             return
 
+        self.valid_boxes_coords = []
         valid_boxes = 0
         for i in range(0, len(data), 4):
             x1, y1, x2, y2 = data[i:i+4]
-            width = abs(x2 - x1)
-
-            self.valid_boxes_coords = []
-            if width >= self.min_box_width:
+            heigth = abs(y2 - y1)
+            if heigth >= self.min_box_heigth:
                 valid_boxes += 1
                 self.valid_boxes_coords.append((x1, y1, x2, y2))
+                # print("heigth: ", heigth)
 
     def cbCrossingFlags(self, msg):
         """Callback bei Empfang eines neuen Richtungsbits."""
@@ -188,6 +189,7 @@ class ControlCrossingNode(DTROS):
                     elapsed = time.time() - self._start_time if self._start_time else 0
                     # Wartephase von 2 Sekunden mit Stillstand
                     if elapsed < 3.0:
+                        # print("WILL V AUF 0 SETZEN!!!!!!!!")
                         twist.v = 0.0
                         twist.omega = 0.0
                     else:
@@ -197,41 +199,50 @@ class ControlCrossingNode(DTROS):
                             mx = (x1 + x2) / 2.0
                             my = (y1 + y2) / 2.0
                             BB_middlepoints.append((mx, my))
+                            # print("BBs: ", mx, ",", my)
 
                         # "Switch-Case" für CrossingMode
-                        if self._mode == CrossingMode.TurnRight:
-                            # Brauche auf niemanden zu achten
-                            allow_crossing = True
-                        elif self._mode == CrossingMode.GoStraight:
-                            # Betrachte rechts
-                            # Prüfe, ob ein Mittelpunkt im rechten Bilddrittel liegt
-                            allow_crossing = not any(mx > (2/3) * 640 for (mx, my) in BB_middlepoints)
-                        elif self._mode == CrossingMode.TurnLeft:
-                            # Betrachte rechts und vorne
-                            allow_crossing = not any((640 / 3) < mx <= (2 * 640 / 3) or mx > (2 * 640 / 3) for (mx, my) in BB_middlepoints)
-                        else:
-                            allow_crossing = False
+                        if self.allow_crossing == False:
+                            if self._mode == CrossingMode.TurnRight:
+                                # Brauche auf niemanden zu achten
+                                self.allow_crossing = True
+                            elif self._mode == CrossingMode.GoStraight:
+                                # Betrachte rechts
+                                # Prüfe, ob ein Mittelpunkt im rechten Bilddrittel liegt
+                                self.allow_crossing = not any(mx > 320 for (mx, my) in BB_middlepoints)
+                                # if any(mx > 320 for (mx, my) in BB_middlepoints):
+                                #     print("SEHE BOT RECHTS")
+                            elif self._mode == CrossingMode.TurnLeft:
+                                # Betrachte rechts und vorne
+                                self.allow_crossing = len(BB_middlepoints) == 0
+                                # if not len(BB_middlepoints) == 0:
+                                #     print("SEHE MITTIG ODER RECHTS BOT")
+                            else:
+                                self.allow_crossing = False
+                                twist.v = 0.0
+                                twist.omega = 0.0
                         
                         # Führe Bewegung aus
-                        if allow_crossing:
+                        if self.allow_crossing:
+                            # print("FÜHRE BEWEGUNG AUS (KREUZUNG)!!!!")
                             twist.v = self._movement['v']
                             twist.omega = self._movement['omega']
-                            self.timestamp = elapsed
-                        else:
-                            twist.v = 0.0
-                            twist.omega = 0.0
+                            if self.timestamp == 0:
+                                self.timestamp = elapsed
+                            
                     
                     duration = self._movement['duration']
-
+                    # print("elapsed: ", elapsed, " duration+stamp: ", duration + self.timestamp)
                     # Wenn die Gesamtzeit (inkl. 2 Sekunden Wartezeit) abgelaufen ist, beende das Manöver
-                    if elapsed >= duration + self.timestamp and allow_crossing == True:
+                    if (elapsed >= duration + self.timestamp) and (self.allow_crossing == True):
                         rospy.loginfo("[Crossing] Manöver abgeschlossen.")
                         self._crossing_active = False
                         self._mode = CrossingMode.Idle
                         self.pub_crossing_enabled.publish(Bool(data=False))
-                        twist.v = 0.0
-                        twist.omega = 0.0
-                        allow_crossing = False
+                        # twist.v = 0.0
+                        # twist.omega = 0.0
+                        self.allow_crossing = False
+                        self.timestamp = 0
 
                 else:
                     twist.v = 0.0
