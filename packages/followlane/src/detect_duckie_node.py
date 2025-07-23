@@ -42,7 +42,8 @@ class DetectDuckieNode(DTROS):
         self.counter = 0
         self.boxes_msg = Float64MultiArray()
 
-        self.last_frame = False
+        self.detected_counter = 0
+        self.confirm_threshold = 3  # Anzahl nötiger Frames zur Bestätigung
         self.image_lock = Lock()
         self.latest_image = None
         self.bridge = CvBridge()
@@ -77,6 +78,7 @@ class DetectDuckieNode(DTROS):
         mask = np.zeros(img.shape[:2], dtype=np.uint8)
         cv2.fillPoly(mask, [self.pts1.astype(np.int32)], 255)
 
+
         # Überprüfung der Bounding Boxes
         for result in results:
             for box in result.boxes:
@@ -84,28 +86,57 @@ class DetectDuckieNode(DTROS):
                 x2, y2 = int(box.xyxy[0][2]), int(box.xyxy[0][3])
                 self.boxes_msg.data.extend([x1, y1, x2, y2])
 
-                # Mittelpunkt der Bounding Box berechnen
-                center_x = int((x1 + x2) / 2)
-                center_y = int((y1 + y2) / 2)
+                # Bounding Box-Kontur erstellen
+                box_polygon = np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.int32)
 
-                # Prüfen, ob die Box im Fahrtbereich liegt
-                if mask[center_y, center_x] == 255:
+                # Überlappung zwischen Box und Maske prüfen
+                # Erstelle leere Maske für die Box
+                box_mask = np.zeros_like(mask, dtype=np.uint8)
+                cv2.fillPoly(box_mask, [box_polygon], 255)
+
+                # UND-Verknüpfung zwischen Box-Maske und Zielmaske
+                overlap = cv2.bitwise_and(mask, box_mask)
+
+                # Zähle überlappende Pixel
+                overlap_area = np.count_nonzero(overlap)
+                box_area = (x2 - x1) * (y2 - y1)
+
+                if box_area > 0 and overlap_area / box_area > 0.2:  # z. B. 20 % Überdeckung
+                    rospy.logdebug(f"[DuckieDetect] Überdeckung {overlap_area}/{box_area} → erkannt")
                     object_in_path = True
-                    break  # Kein weiteres Prüfen nötig, da ein Objekt erkannt wurde
+                    break
+                        
         if object_in_path:
-            if self.last_frame:
-                msg_detected = True
-            else:
-                msg_detected = False
+            self.detected_counter += 1
         else:
-            msg_detected = False
-        self.last_frame = object_in_path
+            self.detected_counter = 0
+        msg_detected = self.detected_counter >= self.confirm_threshold
+        
+        if msg_detected:
+            rospy.loginfo_throttle(1, "[DetectDuckie] Duckie stabil erkannt")
         self.pup_duckie.publish(msg_detected)
             # BoundingBoxen publishen
         self.pub_duckie_boxes.publish(self.boxes_msg) 
 
     def draw_bounding_boxes(self, results, img):
         # print("results: ", len(results[0].boxes))
+        ###################################TEST##################
+
+        # show crop area
+        x_alt = 0
+        y_alt = 0
+        for point in ['top_left', 'top_right', 'bottom_right', 'bottom_left', 'top_left']:
+            x = self.conf['duckie_detect'][f'{point}_x']
+            y = self.conf['duckie_detect'][f'{point}_y']
+
+            if x_alt != 0 or y_alt != 0:
+                img = cv2.line(img,(x_alt,y_alt),(x,y),(255,255,255),2 )
+
+            x_alt = x
+            y_alt = y
+
+###############################TEST END##################
+        
         for result in results:
             for box in result.boxes:
                 cv2.rectangle(img, (int(box.xyxy[0][0]), int(box.xyxy[0][1])),

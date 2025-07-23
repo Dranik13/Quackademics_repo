@@ -22,6 +22,7 @@ class DetectDuckieBot(DTROS):
 
         self._vehicle_name = os.environ['VEHICLE_NAME']
         self._model = YOLO("packages/followlane/assets/model_Duckiebot.pt")
+        self._model.to("cuda")
 
         # Konfiguration laden
         self.load_conf('packages/followlane/config/detect_lane.yaml')
@@ -29,8 +30,8 @@ class DetectDuckieBot(DTROS):
         # Publisher
         self.pub_image = rospy.Publisher(f"/{self._vehicle_name}/detect/duckie_bot/image", Image, queue_size=1)
         self.pub_parking_free = rospy.Publisher(f"/{self._vehicle_name}/parking/free", Bool, queue_size=1)
-        self.pub_duckiebot_box = rospy.Publisher(f"/{self._vehicle_name}/detect/duckiebot_box", Float64MultiArray, queue_size=1)
-        self.pub_duckiebot_stop = rospy.Publisher(f"/{self._vehicle_name}/detect/duckiebot_stop", Bool, queue_size=1)
+        self.pub_duckie_box = rospy.Publisher(f"/{self._vehicle_name}/detect/duckiebot_box", Float64MultiArray, queue_size=1)
+        self.pub_duckie_stopp = rospy.Publisher(f"/{self._vehicle_name}/detect/duckiebot_stopp", Bool, queue_size=1)
 
         # Subscriber
         rospy.Subscriber(f"/{self._vehicle_name}/camera_node/image/compressed", CompressedImage, self.cb_image)
@@ -52,13 +53,17 @@ class DetectDuckieBot(DTROS):
         self.duckie_boxes = []
         self.roi_polygon = None
         self.occupied_parkingspot = False
+        self.min_box_height_for_stop = 80  # typischer Wert für ca. 0.5 m Entfernung (abhängig von Kamera!)
+        self.Duckiebot_Stop = False
+        self.counter = 0
+
 
         # Fahrbereich
         self.static_roi_polygon = np.array([
                 (0, 480),
                 (640, 480),
-                (540, 400),
-                (100, 400)
+                (440, 300),
+                (200, 300)
             ])
         # Transformation Matrix für Birdview
         self.H_birdview = np.array([
@@ -93,8 +98,6 @@ class DetectDuckieBot(DTROS):
             x1, y1, x2, y2 = int(data[i]), int(data[i+1]), int(data[i+2]), int(data[i+3])
             self.duckie_boxes.append((x1, y1, x2, y2))
 
-
-
     def extend_line(self,p1, p2, extend_pixels=80):
 
         """
@@ -122,7 +125,6 @@ class DetectDuckieBot(DTROS):
         y2_ext = int(round(y2 + dir_y * (extend_pixels))) 
 
         return (x1_ext, y1_ext), (x2_ext, y2_ext)
-
 
 
     def cb_parking_roi_line(self, msg):
@@ -201,7 +203,6 @@ class DetectDuckieBot(DTROS):
 
     def draw_boxes(self, results, image):
         self.occupied_parkingspot = False
-        self.Duckiebot_Stop = False
         self.boxes_msg = Float64MultiArray()
         if self.parking_spot_detected:
             if self.pt1_img is not None and self.pt2_img is not None:
@@ -211,9 +212,12 @@ class DetectDuckieBot(DTROS):
                 pt2_right = (self.pt2_img[0] + roi_width, self.pt2_img[1])
 
                 self.roi_polygon = np.array([self.pt1_img, self.pt2_img, pt2_right, pt1_right])
-                if self.conf['debugging_output']['mask_DuckieBot']:
+                if self.conf['debugging_output']['input_mask_DuckieBot']:
                     cv2.polylines(image, [self.roi_polygon.astype(np.int32).reshape((-1, 1, 2))], isClosed=True, color=(255, 0, 0), thickness=2)
-
+        
+        if results is None:
+            self.Duckiebot_Stop = False
+            self.pub_duckie_stopp.publish(self.Duckiebot_Stop)
             
         for result in results:
             for yolo_box in result.boxes:
@@ -224,44 +228,51 @@ class DetectDuckieBot(DTROS):
                 label = result.names[class_id]
                 # Duckiebot in Fahrbahn
                 if self.bbox_overlap_Driveway([x1, y1, x2, y2]):
-                    self.Duckiebot_Stop = True
-                    self.pub_duckiebot_stop.publish(Bool(data=True))
-                    print("Duckiebot in Fahrbahn erkannt")
-                    
+                    self.counter += 1
+                    # self.Duckiebot_Stop = True
+                    # self.pub_duckie_stopp.publish(self.Duckiebot_Stop)
+                    # rospy.loginfo("Duckiebot auf der Fahrbahn erkannt, Stoppen!")
+                
 
                 # Parkplatzerkennung
                 if self.parking_spot_detected:
                     # Prüfe auf Überschneidung
                     if self.bbox_overlaps_roi([x1, y1, x2, y2], self.roi_polygon):
                         self.occupied_parkingspot = True
-                        if self.conf['debugging_output']['mask_DuckieBot']:
+                        if self.conf['debugging_output']['input_mask_DuckieBot']:
                             cv2.putText(image, "OVERLAP", (x1, y2 + 15),
                                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-                if self.conf['debugging_output']['mask_DuckieBot']:
+                if self.conf['debugging_output']['input_mask_DuckieBot']:
                     # Bounding Box zeichnen
                     cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
                     cv2.putText(image, label, (x1, y1 - 5),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+        if self.counter > 0:
+            self.Duckiebot_Stop = True
+            self.counter = 0
+        # print("counter: ", self.counter)
+        # print("duckieStop: ", self.Duckiebot_Stop)
+        self.pub_duckie_stopp.publish(self.Duckiebot_Stop)
+        self.Duckiebot_Stop = False
+
                             
         # erkennung Duckies im Parkplatz
         if self.roi_polygon is not None:
             for x1, y1, x2, y2 in self.duckie_boxes:
                 if self.bbox_overlaps_roi([x1, y1, x2, y2], self.roi_polygon):
                     self.occupied_parkingspot = True
-                    if self.conf['debugging_output']['mask_DuckieBot']: 
+                    if self.conf['debugging_output']['input_mask_DuckieBot']: 
                         cv2.putText(image, "OVERLAP", (x1, y2 + 15),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
                     
         cv2.polylines(image, [self.static_roi_polygon.astype(np.int32).reshape((-1, 1, 2))], isClosed=True, color=(0, 0, 255), thickness=2)
         # Bild publishen
-        # if self.conf['debugging_output']['input_mask_DuckieBot'] or True:
-        #     ros_img = self.bridge.cv2_to_imgmsg(image, encoding="bgr8")
-        #     self.pub_image.publish(ros_img)
-        self.pub_duckiebot_box.publish(self.boxes_msg)
+        if self.conf['debugging_output']['input_mask_DuckieBot'] or True:
+            ros_img = self.bridge.cv2_to_imgmsg(image, encoding="bgr8")
+            self.pub_image.publish(ros_img)
+        self.pub_duckie_box.publish(self.boxes_msg)
         self.pub_parking_free.publish(Bool(data= self.occupied_parkingspot))
-
-            
-       
+        # self.pub_duckie_stopp.publish(self.Duckiebot_Stop)
         if self.occupied_parkingspot and self.parking_spot_detected:
             rospy.loginfo("Parkplatz Belegt")
         # wenn parkplatz erkannt wurde wird einmal geprüft ob der parkplatz frei ist,bei neuer erkennung wird wieder einmal geprüft

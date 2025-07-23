@@ -3,11 +3,13 @@
 import rospy
 import os
 from duckietown_msgs.msg import Twist2DStamped, LEDPattern
-from sensor_msgs.msg import Range
+from sensor_msgs.msg import Range, Image
 from duckietown.dtros import DTROS, NodeType
 from std_msgs.msg import Float64, Int32, Bool, ColorRGBA
 import math
 import yaml
+from rospy.exceptions import ROSException
+from switch_control_node import ControlType
 
 
 class SwitchControlNode(DTROS):
@@ -25,27 +27,23 @@ class SwitchControlNode(DTROS):
         self.sub_lane = rospy.Subscriber(f"/{self._vehicle_name}/control/cmd", Twist2DStamped, self.cbCmdValue, queue_size = 1)
         self.sub_tof = rospy.Subscriber(f"/{self._vehicle_name}/front_center_tof_driver_node/range", Range, self.cbRange, queue_size = 1)
         self.sub_control = rospy.Subscriber(f"/{self._vehicle_name}/switch/control", Int32, self.cb_control_mode)
+        self.sub_Duckiebot_Stop = rospy.Subscriber(f"/{self._vehicle_name}/detect/duckiebot_stopp", Bool, self.cbDuckiebotStop, queue_size = 1)
+        self._yolo_topic = f"/{self._vehicle_name}/detect/duckie/image"
 
         self.control_mode = None
         self.range = Range()
         self.cmd_value = Twist2DStamped()
         self.control_mode = Int32()
+        self.DuckiebotStop = False
 
         self.counter = 0
         self.counter2 = 0
         self.blinking = LEDPattern()
-        # self.blinking.rgb_vals = [
-        #             ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0),  # Weiß Vorne Links
-        #             ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0),  # Rot Hinten Rechts
-        #             ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0),  # Weiß Vorne Rechts
-        #             ColorRGBA(r=0.0, g=1.0, b=0.0, a=1.0),  # Grün
-        #             ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0),  # Rot Hinten Links
-        #         ]
-        # self.pub_blink.publish(self.blinking)
 
         # Timer um die Node verzögert zu starten
         self.ready = False
         rospy.Timer(rospy.Duration(4.0),lambda event: setattr(self, 'ready', True),oneshot=True)
+
 
 
         rospy.on_shutdown(self.fnShutDown)
@@ -61,6 +59,10 @@ class SwitchControlNode(DTROS):
     def cbRange(self, msg):
         self.range = msg
         #rospy.loginfo("Received range value: %f", msg.range)
+
+    def cbDuckiebotStop(self, msg):
+        self.DuckiebotStop = msg.data
+        # print("DuckieStop: ", self.DuckiebotStop)
 
 
     def compute_speed_cos(self, theta, theta_max, v_max, v_min_percent):
@@ -78,24 +80,7 @@ class SwitchControlNode(DTROS):
                     ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0),  # Rot Hinten Links
                 ]
         self.pub_blink.publish(self.blinking)
-    #     if self.counter >= 1:
-    #         self.blinking.rgb_vals = [
-    #                 ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0),  # Rot
-    #                 ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0),  # Rot
-    #                 ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0),  # Rot
-    #                 ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0),  # Weiß
-    #                 ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0),  # Weiß
-    #             ]
-    #         self.counter = 0
-        # else:
-        #     self.blinking.rgb_vals = [
-        #             ColorRGBA(r=0.0, g=0.0, b=1.0, a=1.0),  # Blau
-        #             ColorRGBA(r=1.0, g=1.0, b=0.0, a=1.0),  # Gelb
-        #             ColorRGBA(r=1.0, g=0.0, b=1.0, a=1.0),  # Lila
-        #             ColorRGBA(r=0.0, g=1.0, b=0.0, a=1.0),  # Grün
-        #             ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0),  # Rot
-        #         ]
-        #     self.counter += 1
+ 
 
     def load_conf(self,path):
 
@@ -111,6 +96,7 @@ class SwitchControlNode(DTROS):
     def run(self):
         rate = rospy.Rate(10)   # 10 Hz
         self.blink()
+        self.wait_for_topic()
         while not rospy.is_shutdown():
             # if self.counter2 >= 5:
             #     self.blink()
@@ -120,9 +106,12 @@ class SwitchControlNode(DTROS):
             #     self.counter2 += 1
 
             # if self.range.range <= 0.2:
-            #     msg_cmd = Twist2DStamped(v=0, omega = 0)
-            #     rospy.loginfo("Obstacle detected, stopping the vehicle")
-            if self.control_mode == 3 or self.control_mode == 4 or self.control_mode == 5:
+                # msg_cmd = Twist2DStamped(v=0, omega = 0)
+                # rospy.loginfo("Obstacle detected, stopping the vehicle")
+            if self.DuckiebotStop:
+                msg_cmd = Twist2DStamped(v=0, omega = 0)
+                rospy.logdebug(1,"Obstacle detected, stopping the vehicle")
+            elif self.control_mode in {ControlType.Intersection_Waiting, ControlType.Intersection_Active, ControlType.Parking}:
                 msg_cmd = self.cmd_value
             else:
                 msg_cmd = self.cmd_value
@@ -145,7 +134,14 @@ class SwitchControlNode(DTROS):
         self.cmd_value = Twist2DStamped(v=0.0, omega=0.0)
         twist = Twist2DStamped(v=0.0, omega=0.0)
         self.pub_cmd_vel.publish(twist) 
-            
+
+    def wait_for_topic(self, timeout=30):
+        try:
+            rospy.wait_for_message(self._yolo_topic, Image, timeout=timeout)
+            rospy.loginfo(f"{self._yolo_topic} ist verfügbar.")
+        except ROSException:
+            rospy.logerr(f"Timeout: {self._yolo_topic} wurde nicht innerhalb von {timeout} Sekunden gefunden.")
+            exit(1)            
 
 if __name__ == '__main__':
     # create the node

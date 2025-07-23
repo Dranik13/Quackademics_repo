@@ -52,29 +52,54 @@ class ControlObstacleNode(DTROS):
                 rate.sleep()
                 continue
             
-            # print("self._duckie_detected: ", self._duckie_detected)
+            # # print("self._duckie_detected: ", self._duckie_detected)
+            # if self._control_mode == ObstacleMode.Spin:
+            #     twist = Twist2DStamped(v=0, omega=1)
+            #     self.pub_cmd_vel.publish(twist)
+            
+            # if self._control_mode == ObstacleMode.Move:
+            #     twist = Twist2DStamped(v=0.2, omega=0)
+            #     self.pub_cmd_vel.publish(twist)
+            #     self._counter += 1
+            
+            # if self._duckie_detected:
+            #     self._control_mode = ObstacleMode.Spin
+            # else:
+            #     self._control_mode = ObstacleMode.Move
+            
+            # if self._counter >= 10:
+            #     self._control_mode = ObstacleMode.Stop
+            #     self.enable = False
+            #     twist = Twist2DStamped(v=0.0, omega=0)
+            #     self.pub_cmd_vel.publish(twist)
+            #     self.pub_Obstacle_enabled.publish(Bool(data=False))
+            #     self._counter = 0
+            
+            # rate.sleep()
+            # === Zustand: Drehen ===
             if self._control_mode == ObstacleMode.Spin:
-                twist = Twist2DStamped(v=0, omega=1)
-                self.pub_cmd_vel.publish(twist)
-            
-            if self._control_mode == ObstacleMode.Move:
-                twist = Twist2DStamped(v=0.1, omega=0)
-                self.pub_cmd_vel.publish(twist)
+                self.pub_cmd_vel.publish(Twist2DStamped(v=0, omega=1))
+                # rospy.loginfo("[ObstacleControl] Drehen... (Duckie erkannt)")
+                # rospy.loginfo_throttle(1, "[ObstacleControl] Drehen... (Duckie erkannt)")
+                if not self._duckie_detected:
+                    # rospy.loginfo("[ObstacleControl] Duckie verschwunden → Beginne mit Vorwärtsfahrt")
+                    self._control_mode = ObstacleMode.Move
+                    self._counter = 0  # Reset für die Move-Phase
+
+            # === Zustand: Vorwärts fahren ===
+            elif self._control_mode == ObstacleMode.Move:
+                self.pub_cmd_vel.publish(Twist2DStamped(v=0.2, omega=0))
                 self._counter += 1
-            
-            if self._duckie_detected:
-                self._control_mode = ObstacleMode.Spin
-            else:
-                self._control_mode = ObstacleMode.Move
-            
-            if self._counter >= 12:
-                self._control_mode = ObstacleMode.Stop
-                self.enable = False
-                twist = Twist2DStamped(v=0.0, omega=0)
-                self.pub_cmd_vel.publish(twist)
-                self.pub_Obstacle_enabled.publish(Bool(data=False))
-                self._counter = 0
-            
+                # rospy.loginfo(f"[ObstacleControl] Fahre vorwärts... ({self._counter}/8)")
+                # rospy.loginfo_throttle(1, f"[ObstacleControl] Fahre vorwärts... ({self._counter}/12)")
+
+                if self._counter >= 8:
+                    # rospy.loginfo("[ObstacleControl] Vorwärtsfahrt abgeschlossen → Stop")
+                    self._control_mode = ObstacleMode.Stop
+                    self.enable = False
+                    self._counter = 0
+                    self.pub_cmd_vel.publish(Twist2DStamped(v=0.0, omega=0))
+                    self.pub_Obstacle_enabled.publish(Bool(data=False))
             rate.sleep()
 
 

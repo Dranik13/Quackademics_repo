@@ -200,10 +200,10 @@ class DetectLaneNode(DTROS):
                 last_cx, last_cy = middle_pts[-1]
                 dist = np.sqrt((cx - last_cx)**2 + (cy - last_cy)**2)
                 # print(f"Distanz zum letzten Punkt: {dist:.2f} px")
-                if dist > 120:
+                if dist > 100:
                     continue
             # accept middlepoint of line segment if it is within self.middle_line_look_width                                 cy nicht vergessen!!!!!!!!!!!!!!!!
-            if cx >= mask_x_center - self.middle_line_look_width/2 and cx <= mask_x_center + self.middle_line_look_width and cy > 90:
+            if cx >= mask_x_center - self.middle_line_look_width/2 and cx <= mask_x_center + self.middle_line_look_width and cy > 110:
                 middle_pts.append((cx,cy))
                 cv2.circle(bv_img, (cx, cy), 5, (0, 0, 255), -1)
                 
@@ -248,7 +248,7 @@ class DetectLaneNode(DTROS):
                     # search for sideline
                     if 0 <= new_x < width and 0 <= new_y < height and int(mask_white[int(new_y), int(new_x)]) != 0:
                         sideline_pts.append((int(new_x), int(new_y)))
-                        midpoint = (int((new_x + middle_pts[viewed_pt][0]) / 1.95), int((new_y + middle_pts[viewed_pt][1]) / 2.0))
+                        midpoint = (int((new_x + middle_pts[viewed_pt][0]) / 1.97), int((new_y + middle_pts[viewed_pt][1]) / 2.0))
                         desired_centers.append(midpoint)
                         middle_pt_far_enough = True
                         # if midpoint[1] < 190 and middle_pt_far_enough == False:
