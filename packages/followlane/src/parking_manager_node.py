@@ -52,7 +52,7 @@ class ParkingManagerNode(DTROS):
 
  
     def cb_parking_spot(self, msg):
-        #rospy.loginfo(f"Parkplatz erkannt: {msg.data}, Parkplatz aktiv: {self.parking_started} , Parkplatz belegt: {self.parking_spot_occupied }")
+        rospy.loginfo(f"Parkplatz erkannt: {msg.data}, Parkplatz aktiv: {self.parking_started} , Parkplatz belegt: {self.parking_spot_occupied }")
         if msg.data and not self.parking_started and not self.parking_spot_occupied :
             rospy.loginfo("Parkplatz erkannt. Verzögert einparken.")
             self.waiting_for_single_mark = True

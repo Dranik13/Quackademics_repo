@@ -39,6 +39,12 @@ class DetectLaneNode(DTROS):
         self.drive_left = False
         self.marker_stable_park = False
         self.roi_line_msg = Float64MultiArray()
+        self.x_start=0
+        self.y_start=0 
+        self.x_end = 0 
+        self.y_end =0
+
+
 
         self.bb_duckiebots = Float64MultiArray()
         self.bb_duckies = Float64MultiArray()
@@ -503,20 +509,20 @@ class DetectLaneNode(DTROS):
                     y_vals = [pt[1] for pt in centers]
                     m, b = np.polyfit(x_vals, y_vals, 1)
                       # Grenzen der X-Achse im Bild (links/rechts)
-                    x_start = x_vals[0]  # Startpunkt der Linie
-                    x_end = x_vals[-1]  # Endpunkt der Linie    
+                    self.x_start = x_vals[0]  # Startpunkt der Linie
+                    self.x_end = x_vals[-1]  # Endpunkt der Linie    
 
                     # Berechne zugehörige Y-Werte
-                    y_start = int(m * x_start + b)
-                    y_end = int(m * x_end + b)
+                    self.y_start = int(m * self.x_start + b)
+                    self.y_end = int(m * self.x_end + b)
 
                     # Begrenze auf gültigen Bildbereich
-                    y_start = max(0, min(bv_img.shape[0] - 1, y_start))
-                    y_end = max(0, min(bv_img.shape[0] - 1, y_end))
+                    self.y_start = max(0, min(bv_img.shape[0] - 1, self.y_start))
+                    self.y_end = max(0, min(bv_img.shape[0] - 1, self.y_end))
 
                     # Zeichne die Gerade in Lila
                     if self.show_output_img:
-                        cv2.line(bv_img, (x_start, y_start), (x_end, y_end), (255, 0, 255), 2)  # Lila Linie
+                        cv2.line(bv_img, (self.x_start, self.y_start), (self.x_end, self.y_end), (255, 0, 255), 2)  # Lila Linie
 
                     # Publish ROI Punkt
                     # self.roi_msg.data = [x_roi, y_roi]
@@ -528,19 +534,20 @@ class DetectLaneNode(DTROS):
             # # # Puffer aktualisieren
             self.parking_buffer.append(found_parking)
 
-            # Stabilitäts-Entscheidung: mind. 7 von 10
+            # Stabilitäts-Entscheidung: mind. 3 von 4
             stable_parking = sum(self.parking_buffer) >= 3
 
                 
             if stable_parking:
                 self.marker_stable_park = True
                 self.pub_parking_spot.publish(Bool(data=stable_parking))
-                print("Parkplatz erkannt!")
-                if len(self.roi_line_msg.data) == 4:
-                    self.roi_line_msg.data = [float(x_start), float(y_start), float(x_end), float(y_end)]
+                if None not in (self.x_start, self.y_start, self.x_end, self.y_end):
+                    # Alle Werte sind gesetzt
+                    self.roi_line_msg.data = [float(self.x_start), float(self.y_start), float(self.x_end), float(self.y_end)]
                     self.pub_parking_roi_px.publish(self.roi_line_msg)
+
             if self.marker_stable_park:
-                print("wartebis Parkplatz-Markierung 1 ist")
+                #print("wartebis Parkplatz-Markierung 1 ist")
 
                 # Neue Bedingung: Nur eine Parkplatz-Markierung gefunden
                 num_parking_marks = len(parking_lot_marks)
@@ -549,7 +556,7 @@ class DetectLaneNode(DTROS):
 
                 # Nur senden, wenn sich der Zustand geändert hat
                 if single_mark_detected:
-                    print("Parkplatz-Markierung 1 erkannt!")
+                    #print("Parkplatz-Markierung 1 erkannt!")
                     self.pub_single_parking_mark.publish(Bool(data=single_mark_detected))
                     self.marker_stable_park = False  # Reset für nächste Runde
 
