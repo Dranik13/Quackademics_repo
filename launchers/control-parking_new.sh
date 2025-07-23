@@ -4,7 +4,6 @@ source /environment.sh
 
 dt-launchfile-init
 
-
-rosrun followlane control_traffic_intersection_node.py
+rosrun followlane WhiteMaskDebugNode.py
 
 dt-launchfile-join

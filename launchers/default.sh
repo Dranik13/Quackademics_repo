@@ -17,16 +17,16 @@ dt-launchfile-init
 #dt-exec bash /launch/Quackademics_repo/camera-reader.sh
 
 dt-exec bash /launch/Quackademics_repo/switch-control.sh &
-#dt-exec bash /launch/Quackademics_repo/detect-duckie.sh &
+dt-exec bash /launch/Quackademics_repo/detect-duckie.sh &
 dt-exec bash /launch/Quackademics_repo/detect-lane.sh &
 dt-exec bash /launch/Quackademics_repo/control-lane.sh &
 #dt-exec bash /launch/Quackademics_repo/control-obstacle.sh &
-dt-exec bash /launch/Quackademics_repo/cmd-control.sh &
+#dt-exec bash /launch/Quackademics_repo/cmd-control.sh &
 #dt-exec bash /launch/Quackademics_repo/detect_intersection.sh &
 #dt-exec bash /launch/Quackademics_repo/control_intersection.sh &
 dt-exec bash /launch/Quackademics_repo/parking-manager.sh &
 dt-exec bash /launch/Quackademics_repo/control-parking.sh 
-#dt-exec bash /launch/Quackademics_repo/detect-duckiebot.sh
+dt-exec bash /launch/Quackademics_repo/detect-duckiebot.sh
 
 
 # ----------------------------------------------------------------------------
