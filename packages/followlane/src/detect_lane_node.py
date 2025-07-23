@@ -140,17 +140,26 @@ class DetectLaneNode(DTROS):
         #     bottom_right_corner = (result[2], result[3])
         #     cv2.rectangle(cv_image_copy, top_left_corner, bottom_right_corner, -1)
         Black = (0,0,0)
+        o_height, o_width = cv_image.shape[:2]  # <-- HIER hinzufügen
         if self.bb_duckiebots is not None and len(self.bb_duckiebots.data) >=4:
             for i in range(0, len(self.bb_duckiebots.data), 4):
-                top_left_corner = (int(self.bb_duckiebots.data[i]), int(self.bb_duckiebots.data[i+1]))
-                bottom_right_corner = (int(self.bb_duckiebots.data[i+2]), int(self.bb_duckiebots.data[i+3]))
+                x1 = max(0, min(int(self.bb_duckiebots.data[i]), o_width-1))
+                y1 = max(0, min(int(self.bb_duckiebots.data[i+1]), o_height-1))
+                x2 = max(0, min(int(self.bb_duckiebots.data[i+2]), o_width-1))
+                y2 = max(0, min(int(self.bb_duckiebots.data[i+3]), o_height-1))
+                top_left_corner = (x1, y1)
+                bottom_right_corner = (x2, y2)
                 cv2.rectangle(cv_image, top_left_corner, bottom_right_corner,Black, -1)
             # cv2.imshow("Rechteck",cv_image_copy)
 
         if self.bb_duckies is not None and len(self.bb_duckies.data) >=4:
             for i in range(0, len(self.bb_duckies.data), 4):
-                top_left_corner = (int(self.bb_duckies.data[i]), int(self.bb_duckies.data[i+1]))
-                bottom_right_corner = (int(self.bb_duckies.data[i+2]), int(self.bb_duckies.data[i+3]))
+                x1 = max(0, min(int(self.bb_duckies.data[i]), o_width-1))
+                y1 = max(0, min(int(self.bb_duckies.data[i+1]), o_height-1))
+                x2 = max(0, min(int(self.bb_duckies.data[i+2]), o_width-1))
+                y2 = max(0, min(int(self.bb_duckies.data[i+3]), o_height-1))
+                top_left_corner = (x1, y1)
+                bottom_right_corner = (x2, y2)
                 cv2.rectangle(cv_image, top_left_corner, bottom_right_corner, Black, -1)
 
         bv_img = self.transformToBirdsView(cv_image)
@@ -289,12 +298,7 @@ class DetectLaneNode(DTROS):
             if white_contours:
                 middle_pt_far_enough = True
                 # find lowest contur (highest y-Wert)
-                lowest_contour = max(
-                white_contours,
-                key=lambda c: (
-                    cv2.boundingRect(c)[1] + cv2.boundingRect(c)[3],  # y + h (unterste Kante)
-                    cv2.boundingRect(c)[0] + cv2.boundingRect(c)[2]   # x + w (rechteste Kante)
-                ))
+                lowest_contour = max(white_contours, key=lambda c: cv2.boundingRect(c)[1] + cv2.boundingRect(c)[3])
                 cx, cy = calcMiddlePtOfContours(lowest_contour)
 
                 if self.drive_left:

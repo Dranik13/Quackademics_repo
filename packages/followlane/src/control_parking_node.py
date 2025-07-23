@@ -146,7 +146,7 @@ class ControlParkingNode(DTROS):
             cmd.v = 0.2
             cmd.omega = 0
             self.step_counter += 1
-            if self.step_counter >= 7:
+            if self.step_counter >= 4:
                 self.current_step = 103
                 self.step_counter = 0
         elif self.current_step == 103:
