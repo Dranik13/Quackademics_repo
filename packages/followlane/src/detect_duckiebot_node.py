@@ -211,7 +211,7 @@ class DetectDuckieBot(DTROS):
             #print(f"pt1_img{self.pt1_img}, pt2 {self.pt2_img}")
             if self.pt1_img is not None and self.pt2_img is not None:
                 # ➤ Verschiebe nur in x-Richtung (nach rechts)
-                roi_width = 120
+                roi_width = 140
                 pt1_right = (self.pt1_img[0] + (roi_width*1.5), self.pt1_img[1]-60)
                 pt2_right = (self.pt2_img[0] + roi_width, self.pt2_img[1])
 
@@ -261,10 +261,11 @@ class DetectDuckieBot(DTROS):
 
                             
         # erkennung Duckies im Parkplatz
-        if self.roi_polygon is not None:
+        if self.parking_spot_detected and self.roi_polygon is not None:
             for x1, y1, x2, y2 in self.duckie_boxes:
                 if self.bbox_overlaps_roi([x1, y1, x2, y2], self.roi_polygon):
                     self.occupied_parkingspot = True
+                    print(f"Parkplatz belegt durch Ente")
                     if self.conf['debugging_output']['input_mask_DuckieBot']: 
                         cv2.putText(image, "OVERLAP", (x1, y2 + 15),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
