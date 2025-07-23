@@ -46,6 +46,7 @@ class CrossingIntersectionNode(DTROS):
         # Publisher
         self.pub_direction = rospy.Publisher(self._direction_topic, Int32, queue_size=1)
         self.pub_debug_img = rospy.Publisher(self._debug_img_topic, Image, queue_size=1)
+        self.pub_stopping_angle = rospy.Publisher(f"/{self._vehicle_name}/computed/stopping_angle", Int32, queue_size=1)
 
         # Subscriber
         self.sub_image = rospy.Subscriber(self._camera_topic, CompressedImage, self.cbImageCallback, queue_size=1)
@@ -54,6 +55,8 @@ class CrossingIntersectionNode(DTROS):
         # Zustand
         self.stop_active = False
         self.last_selected_direction = None  # Neu: letzte gewählte Richtung speichern
+        self.stoppingconture=   None  # Neu: Kontur für Stop-Zeichen speichern
+        self.stopping_angle = 0
 
     def cbImageCallback(self, image_msg):
         
@@ -67,6 +70,9 @@ class CrossingIntersectionNode(DTROS):
 
         # Flag für Stop erkennen ermitteln
         stop_detected = bool(flags_bin & self.DIRECTIONS["Stop"])
+        self.stopping_angle = self.get_angle(self.stoppingconture) if hasattr(self, 'stoppingconture') else 0
+        print(f"Stopping angle: {self.stopping_angle}")
+        cv2.putText(debug_img, "Angle: {self.stopping_angle:.1f} deg", (40, 140), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 0), 3)
 
         if stop_detected and not self.stop_active:
             selected_flags = self.choose_random_direction(flags_bin)
@@ -74,6 +80,7 @@ class CrossingIntersectionNode(DTROS):
                 bit for key, bit in self.DIRECTIONS.items() if selected_flags.get(key, False)
             )
             self.pub_direction.publish(Int32(data=selected_flags_bin))
+            
             rospy.loginfo(f"[Intersection] Richtung gesendet: {bin(selected_flags_bin)}")
             self.stop_active = True
 
@@ -110,6 +117,8 @@ class CrossingIntersectionNode(DTROS):
         #Debug-Bild senden
         debug_msg = self.bridge.cv2_to_imgmsg(debug_img, encoding="bgr8")
         self.pub_debug_img.publish(debug_msg)
+        cv2.imshow("Intersection Debug", debug_img)
+        cv2.waitKey(1)
 
     def choose_random_direction(self, state):
         stop_active = bool(state & self.DIRECTIONS["Stop"])
@@ -134,6 +143,42 @@ class CrossingIntersectionNode(DTROS):
             "Left": chosen == "Left",
             "Straight": chosen == "Straight"
         }
+    
+    def get_angle(self,contour):
+        """
+        Bestimmt die linke und rechte Ecke der oberen Kante einer Kontur,
+        sowie den Winkel dieser Kante zur Horizontalen.
+
+        Args:
+            contour (np.ndarray): OpenCV-Kontur mit shape (N, 1, 2)
+            tolerance (int): Pixel-Toleranz um die oberste Linie zu erkennen
+
+        Returns:
+            top_left (tuple): linker Punkt der oberen Kante (x, y)
+            top_right (tuple): rechter Punkt der oberen Kante (x, y)
+            angle_deg (float): Winkel der oberen Kante zur Horizontalen (in Grad)
+        """
+        if contour is None or len(contour) == 0:
+            rospy.logwarn("⚠️ Ungültige oder leere Kontur – Winkel nicht berechnet.")
+            return 0.0
+        contour = contour.astype(np.int32)
+        epsilon = 0.02 * cv2.arcLength(contour, True)
+        approx = cv2.approxPolyDP(contour, epsilon, True)
+        angle_deg = 0
+        # Überprüfen, ob die Kontur 4 Ecken hat
+        if len(approx) == 4:
+            
+            print("Kontur hat 4 Ecken")
+            pts = approx[:, 0, :]  # Nur x,y extrahieren
+            # Sortieren nach y (von oben nach unten)
+            pts_sorted = pts[np.argsort(pts[:, 1])]
+
+            top1, top2 = pts_sorted[0], pts_sorted[1]  # obere zwei Punkte
+            dx = top2[0] - top1[0]
+            dy = top2[1] - top1[1]
+            angle_deg = np.degrees(np.arctan2(dy, dx))
+
+        return  angle_deg
 
     def compute_possible_directions(self, image, distance=0.7):
         flags = {key: False for key in self.DIRECTIONS}
@@ -187,13 +232,16 @@ class CrossingIntersectionNode(DTROS):
         for c in contours:
             if cv2.contourArea(c) > 1500:
                 count = 0
+                # Zähle Punkte im Bereich
                 for point in c:
                     x = point[0][0]
                     y = point[0][1]
                     if y >= y_schwelle and x >= x_links and x <= x_rechts:
+                        # Zähle nur Punkte, die im unteren Drittel des Bildes liegen
                         count += 1
                         if count >= 100:
                             flags["Stop"] = True
+                            self.stoppingconture = c
                             break
 
 
