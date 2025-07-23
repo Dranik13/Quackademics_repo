@@ -100,7 +100,7 @@ class ControlParkingNode(DTROS):
             cmd.v = -0.2
             cmd.omega = 0
             self.step_counter += 1
-            if self.step_counter >= 10:
+            if self.step_counter >= 13:
                 self.current_step += 1
                 self.step_counter = 0
                 rospy.loginfo("Einparkvorgang: 2. Schritt abgeschlossen.")
@@ -136,7 +136,7 @@ class ControlParkingNode(DTROS):
         elif self.current_step == 101:
             # Vorwärts + Lenken links
             cmd.v = 0.0
-            cmd.omega = 2
+            cmd.omega = 1.8
             self.step_counter += 1
             if self.step_counter >= 10:
                 self.current_step = 102
@@ -146,13 +146,13 @@ class ControlParkingNode(DTROS):
             cmd.v = 0.2
             cmd.omega = 0
             self.step_counter += 1
-            if self.step_counter >= 10:
+            if self.step_counter >= 7:
                 self.current_step = 103
                 self.step_counter = 0
         elif self.current_step == 103:
             # Vorwärts + Lenken rechts
             cmd.v = 0.1
-            cmd.omega = -2
+            cmd.omega = -1.8
             self.step_counter += 1
             if self.step_counter >= 10:
                 self.current_step = 104

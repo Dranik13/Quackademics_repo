@@ -144,6 +144,7 @@ class DetectDuckieBot(DTROS):
             pt1_ext, pt2_ext = self.extend_line(self.pt1_img, self.pt2_img, extend_pixels=30)
             self.pt1_img = pt1_ext
             self.pt2_img = pt2_ext
+            #print("Punkte parkplatz erweitert")
 
 
         except Exception as e:
@@ -180,6 +181,8 @@ class DetectDuckieBot(DTROS):
 
     
     def bbox_overlaps_roi(self, bbox_xyxy, roi_polygon):
+        if roi_polygon is None or len(roi_polygon) == 0:
+            return False
         x1, y1, x2, y2 = bbox_xyxy
         box_pts = np.array([
             (x1, y1),
@@ -202,9 +205,10 @@ class DetectDuckieBot(DTROS):
         return np.any(roi_path.contains_points(box_pts))
 
     def draw_boxes(self, results, image):
-        self.occupied_parkingspot = False
+
         self.boxes_msg = Float64MultiArray()
         if self.parking_spot_detected:
+            #print(f"pt1_img{self.pt1_img}, pt2 {self.pt2_img}")
             if self.pt1_img is not None and self.pt2_img is not None:
                 # ➤ Verschiebe nur in x-Richtung (nach rechts)
                 roi_width = 120
@@ -276,12 +280,14 @@ class DetectDuckieBot(DTROS):
         if self.occupied_parkingspot and self.parking_spot_detected:
             rospy.loginfo("Parkplatz Belegt")
         # wenn parkplatz erkannt wurde wird einmal geprüft ob der parkplatz frei ist,bei neuer erkennung wird wieder einmal geprüft
+        if not self.parking_spot_detected:
+            self.occupied_parkingspot = False
         if self.parking_spot_detected:
             self.parking_spot_detected = False
 
         cv2.imshow("Duckiebot Detection", image)
         cv2.waitKey(1)
-        print("Test")
+        
 
         
 
