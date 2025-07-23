@@ -262,7 +262,7 @@ class DetectDuckieBot(DTROS):
 
             
        
-        if self.occupied_parkingspot:
+        if self.occupied_parkingspot and self.parking_spot_detected:
             rospy.loginfo("Parkplatz Belegt")
         # wenn parkplatz erkannt wurde wird einmal geprüft ob der parkplatz frei ist,bei neuer erkennung wird wieder einmal geprüft
         if self.parking_spot_detected:
