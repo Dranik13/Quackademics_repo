@@ -42,7 +42,8 @@ class SwitchControlNode(DTROS):
 
         # Timer um die Node verzögert zu starten
         self.ready = False
-        rospy.Timer(rospy.Duration(5.0),lambda event: setattr(self, 'ready', True),oneshot=True)
+        rospy.Timer(rospy.Duration(4.0),lambda event: setattr(self, 'ready', True),oneshot=True)
+
 
 
         rospy.on_shutdown(self.fnShutDown)

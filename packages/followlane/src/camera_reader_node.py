@@ -45,7 +45,7 @@ class CameraReaderNode(DTROS):
         #self.createWindow(0)
 
         # construct subscriber
-        self.sub = rospy.Subscriber(self._camera_topic, CompressedImage, self.callback)
+        self.sub = rospy.Subscriber(self._camera_topic, CompressedImage, self.callback,queue_size = 1)
         self.pub_result = rospy.Publisher(self._camera_topic_send, Image, queue_size = 1)
         self.pub_circle = rospy.Publisher(self._camera_topic_send1, Image, queue_size = 1)
         self.pub_crop_area = rospy.Publisher(self._camera_topic_send2, Image, queue_size = 1)

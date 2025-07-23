@@ -107,8 +107,7 @@ class CrossingIntersectionNode(DTROS):
                     4
                 )
 
-         #Debug-Bild senden
-
+        #Debug-Bild senden
         debug_msg = self.bridge.cv2_to_imgmsg(debug_img, encoding="bgr8")
         self.pub_debug_img.publish(debug_msg)
 
@@ -182,13 +181,21 @@ class CrossingIntersectionNode(DTROS):
         cv2.circle(image_copy, tuple(center_img), 5, (255, 0, 0), -1)
 
         y_schwelle = int(height * distance)
+        x_links = int(width * 0.15)
+        x_rechts = int(width * 0.85)
+
         for c in contours:
-            if cv2.contourArea(c) > 2000:
+            if cv2.contourArea(c) > 1500:
+                count = 0
                 for point in c:
+                    x = point[0][0]
                     y = point[0][1]
-                    if y >= y_schwelle:
-                        flags["Stop"] = True
-                        break
+                    if y >= y_schwelle and x >= x_links and x <= x_rechts:
+                        count += 1
+                        if count >= 100:
+                            flags["Stop"] = True
+                            break
+
 
         for w in winkel_liste:
             for direction, (min_angle, max_angle) in self.ANGLE_THRESHOLDS.items():

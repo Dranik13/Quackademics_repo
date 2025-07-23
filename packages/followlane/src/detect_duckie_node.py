@@ -17,7 +17,7 @@ class DetectDuckieNode(DTROS):
         # initialize the DTROS parent class
         super(DetectDuckieNode, self).__init__(node_name=node_name, node_type=NodeType.VISUALIZATION)
         self._model = YOLO("packages/followlane/assets/model.pt")
-        self._model.to("cuda")
+        #self._model.to("cuda")
 
         self.load_conf('packages/followlane/config/detect_lane.yaml')
         self._vehicle_name = os.environ['VEHICLE_NAME']

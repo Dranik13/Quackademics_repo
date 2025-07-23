@@ -25,34 +25,41 @@ duckie_detect:
   bottom_left_y: 480
 white:
 # BEI GELBLICHEM BILD
-  # hh: 255
-  # hl: 0
-  # sh: 80
-  # sl: 0
-  # vh: 255
-  # vl: 180
-# BEI BLAULICHEM BILD
-  hh: 180
+  hh: 255
   hl: 0
-  sh: 35
+  sh: 80
   sl: 0
   vh: 255
-  vl: 170
+  vl: 180
+# BEI BLAULICHEM BILD
+  # hh: 180
+  # hl: 0
+  # sh: 35
+  # sl: 0
+  # vh: 255
+  # vl: 170
+# Robin
+  # hh: 255
+  # hl: 0
+  # sh: 86
+  # sl: 0
+  # vh: 255
+  # vl: 159
 yellow:
 # BEI GELBLICHEM BILD
-  # hh: 40
-  # hl: 15
-  # sh: 255
-  # sl: 110
-  # vh: 255
-  # vl: 150
-# BEI BLAULICHEM BILD
   hh: 40
   hl: 15
   sh: 255
-  sl: 60
+  sl: 110
   vh: 255
-  vl: 130
+  vl: 150
+# BEI BLAULICHEM BILD
+  # hh: 40
+  # hl: 15
+  # sh: 255
+  # sl: 60
+  # vh: 255
+  # vl: 130
 red:
   hh: 0
   hl: 10
@@ -82,7 +89,7 @@ search_for_parking_lot:
 debugging_output:
   line_coordinates: false
   input_image: false
-  output_image: true
+  output_image: false
   mask_white: false
   mask_yellow: false
   input_mask_DuckieBot: false

@@ -37,7 +37,7 @@ class DetectLaneNode(DTROS):
         self.obstacle_avoidance_timer = 0
         self.obstacle_avoidance_timer_run = False
         self.drive_left = False
-        
+        self.marker_stable_park = False
         self.roi_line_msg = Float64MultiArray()
 
         self.bb_duckiebots = Float64MultiArray()
@@ -72,6 +72,7 @@ class DetectLaneNode(DTROS):
         self.pub_parking_spot = rospy.Publisher(f'/{self._vehicle_name}/detect/parking_spot', Bool, queue_size=1)
         self.pub_parking_debug = rospy.Publisher(f"/{self._vehicle_name}/debug/parking_img", Image, queue_size=1)
         self.pub_parking_roi_px = rospy.Publisher(f"/{self._vehicle_name}/detect/parking_roi_px", Float64MultiArray, queue_size=1)
+        self.pub_single_parking_mark = rospy.Publisher(f"/{self._vehicle_name}/parking/single_mark_detected", Bool, queue_size=1)
 
     def transformToBirdsView(self, img):
         img = img.copy()
@@ -420,16 +421,18 @@ class DetectLaneNode(DTROS):
         # detect parking lot
         potential_parking_lot_marks = []
         parking_lot_marks = []
+
         if self.look_for_parkinglot and sideline_pts:
             if not white_contours and len(white_contours) <= 0:
                 white_contours, _ = cv2.findContours(mask_white, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                 
             x_search_coordinate = sideline_pts[len(sideline_pts)//2][0]
-              
+            #cv2.drawContours(bv_img, white_contours, -1, (255, 0, 0), 1)
+            #print(f"white contours: {len(white_contours)}")  
             # search for rectangle-like contours in the white mask
             for contour in white_contours:
                 area = cv2.contourArea(contour)
-                if area < 150 or area > 600:
+                if area < 250 or area > 720:
                     continue
 
                 x, y, w, h = cv2.boundingRect(contour)
@@ -439,8 +442,9 @@ class DetectLaneNode(DTROS):
                 #          (x_search_coordinate - self.search_range, bv_img.shape[0]), (0, 255, 0), 2)
                 # cv2.line(bv_img, (x_search_coordinate + self.search_range, 0), 
                 #          (x_search_coordinate + self.search_range, bv_img.shape[0]), (0, 255, 0), 2)
+                
 
-                if 0.6 < aspect_ratio < 1.5 and 10 < w < 28 and 10 < h < 28:
+                if 0.5 < aspect_ratio < 1.5 and 10 < w < 38 and 10 < h < 38:
                     if x_search_coordinate - self.search_range <= x <= x_search_coordinate + self.search_range:
                         cv2.rectangle(bv_img, (x, y), (x+w, y+h), (0, 255, 255), 2)
                         info_text = f"w:{w}, h:{h}, ar:{aspect_ratio:.2f}, area:{area}"
@@ -448,12 +452,7 @@ class DetectLaneNode(DTROS):
 
                         potential_parking_lot_marks.append(contour)
             
-            # for contour in white_contours:
-            #     for pt in contour:
-            #         x = pt[0][0]
-            #         if x_search_coordinate - self.search_range <= x <= x_search_coordinate + self.search_range:
-            #             potential_parking_lot_marks.append(contour)
-            #             break
+
 
             if len(potential_parking_lot_marks) >= self.min_nr_line_segments:
                 # y-coordinates of marks have to be close to each other
@@ -477,26 +476,11 @@ class DetectLaneNode(DTROS):
                         # Debug-Text in ROT direkt neben dem zweiten Punkt
                         if self.show_output_img:
                             diff_text = f"Δy: {diff_y}"
-                            cv2.putText(bv_img, diff_text, (x_curr + 5, y_curr - 5),
+                            cv2.putText(bv_img, diff_text, (x_curr + 15, y_curr - 5),
                                         cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1)
 
                         if diff_y <= self.max_y_diff:
                             parking_lot_marks.append(potential_parking_lot_marks[i])
-
-            # nearby_parking = False
-            # if parking_lot_marks:
-            #     # Prüfe Y-Koordinaten der Mittelpunkte
-            #     y_positions = []
-            #     for contour in parking_lot_marks:
-            #         cx, cy = calcMiddlePtOfContours(contour)
-            #         if cy is not None:
-            #             y_positions.append(cy)
-    
-            #     # Mindestanzahl von Markierungen in der Nähe prüfen
-            #     near_threshold = 300  # (abhängig vom Bildausschnitt, evtl. anpassen)
-            #     if sum(1 for y in y_positions if y > near_threshold) >= self.min_nr_line_segments:
-            #         nearby_parking = True
-            #         rospy.loginfo("✅ Parkplatz erkannt!")
 
          
             
@@ -532,8 +516,7 @@ class DetectLaneNode(DTROS):
                     # Publish ROI Punkt
                     # self.roi_msg.data = [x_roi, y_roi]
                     # self.pub_parking_roi_px.publish(self.roi_msg)
-                    self.roi_line_msg.data = [float(x_start), float(y_start), float(x_end), float(y_end)]
-                    self.pub_parking_roi_px.publish(self.roi_line_msg)
+                    
             
             # if found_parking:
             #     rospy.loginfo("✅ Parkplatz erkannt!")
@@ -542,8 +525,29 @@ class DetectLaneNode(DTROS):
 
             # Stabilitäts-Entscheidung: mind. 7 von 10
             stable_parking = sum(self.parking_buffer) >= 3
+
+                
             if stable_parking:
+                self.marker_stable_park = True
                 self.pub_parking_spot.publish(Bool(data=stable_parking))
+                print("Parkplatz erkannt!")
+                if len(self.roi_line_msg.data) == 4:
+                    self.roi_line_msg.data = [float(x_start), float(y_start), float(x_end), float(y_end)]
+                    self.pub_parking_roi_px.publish(self.roi_line_msg)
+            if self.marker_stable_park:
+                print("wartebis Parkplatz-Markierung 1 ist")
+
+                # Neue Bedingung: Nur eine Parkplatz-Markierung gefunden
+                num_parking_marks = len(parking_lot_marks)
+                single_mark_detected = (num_parking_marks <= 1)
+
+
+                # Nur senden, wenn sich der Zustand geändert hat
+                if single_mark_detected:
+                    print("Parkplatz-Markierung 1 erkannt!")
+                    self.pub_single_parking_mark.publish(Bool(data=single_mark_detected))
+                    self.marker_stable_park = False  # Reset für nächste Runde
+
             #rospy.loginfo_throttle(1, f"Publishing parking: {found_parking}")
             #rospy.loginfo_throttle(1, f"Parkplatz-Erkennung: potenziell={len(potential_parking_lot_marks)}, akzeptiert={len(parking_lot_marks)}")
 

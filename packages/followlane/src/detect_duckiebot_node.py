@@ -121,8 +121,8 @@ class DetectDuckieBot(DTROS):
         # Verlängertes p2
         x1_ext = int(round(x1 - dir_x * extend_pixels))
         y1_ext = int(round(y1 - dir_y * extend_pixels))
-        x2_ext = int(round(x2 + dir_x * (extend_pixels)/5))
-        y2_ext = int(round(y2 + dir_y * (extend_pixels)/5)) 
+        x2_ext = int(round(x2 + dir_x * (extend_pixels)))
+        y2_ext = int(round(y2 + dir_y * (extend_pixels))) 
 
         return (x1_ext, y1_ext), (x2_ext, y2_ext)
 
@@ -141,7 +141,7 @@ class DetectDuckieBot(DTROS):
             self.pt1_img = self.bv_point_to_original_image(pt1_bird[0], pt1_bird[1], self.inverTransform_matrix)
             self.pt2_img = self.bv_point_to_original_image(pt2_bird[0], pt2_bird[1], self.inverTransform_matrix)
             
-            pt1_ext, pt2_ext = self.extend_line(self.pt1_img, self.pt2_img, extend_pixels=70)
+            pt1_ext, pt2_ext = self.extend_line(self.pt1_img, self.pt2_img, extend_pixels=30)
             self.pt1_img = pt1_ext
             self.pt2_img = pt2_ext
 
@@ -207,8 +207,8 @@ class DetectDuckieBot(DTROS):
         if self.parking_spot_detected:
             if self.pt1_img is not None and self.pt2_img is not None:
                 # ➤ Verschiebe nur in x-Richtung (nach rechts)
-                roi_width = 100
-                pt1_right = (self.pt1_img[0] + (roi_width*1.5), self.pt1_img[1]-40)
+                roi_width = 120
+                pt1_right = (self.pt1_img[0] + (roi_width*1.5), self.pt1_img[1]-60)
                 pt2_right = (self.pt2_img[0] + roi_width, self.pt2_img[1])
 
                 self.roi_polygon = np.array([self.pt1_img, self.pt2_img, pt2_right, pt1_right])
@@ -233,6 +233,7 @@ class DetectDuckieBot(DTROS):
                     # self.pub_duckie_stopp.publish(self.Duckiebot_Stop)
                     # rospy.loginfo("Duckiebot auf der Fahrbahn erkannt, Stoppen!")
                 
+
                 # Parkplatzerkennung
                 if self.parking_spot_detected:
                     # Prüfe auf Überschneidung
@@ -274,6 +275,12 @@ class DetectDuckieBot(DTROS):
         # self.pub_duckie_stopp.publish(self.Duckiebot_Stop)
         if self.occupied_parkingspot and self.parking_spot_detected:
             rospy.loginfo("Parkplatz Belegt")
+        # wenn parkplatz erkannt wurde wird einmal geprüft ob der parkplatz frei ist,bei neuer erkennung wird wieder einmal geprüft
+        if self.parking_spot_detected:
+            self.parking_spot_detected = False
+
+        cv2.imshow("Duckiebot Detection", image)
+        cv2.waitKey(1)
 
         
 
