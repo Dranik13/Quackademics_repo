@@ -47,19 +47,19 @@ white:
   # vl: 159
 yellow:
 # BEI GELBLICHEM BILD
-  hh: 40
-  hl: 15
-  sh: 255
-  sl: 110
-  vh: 255
-  vl: 150
-# BEI BLAULICHEM BILD
   # hh: 40
   # hl: 15
   # sh: 255
-  # sl: 60
+  # sl: 110
   # vh: 255
-  # vl: 130
+  # vl: 150
+# BEI BLAULICHEM BILD
+  hh: 40
+  hl: 15
+  sh: 255
+  sl: 60
+  vh: 255
+  vl: 130
 red:
   hh: 0
   hl: 10
@@ -89,10 +89,10 @@ search_for_parking_lot:
 debugging_output:
   line_coordinates: false
   input_image: false
-  output_image: false
+  output_image: true
   mask_white: false
   mask_yellow: false
-  input_mask_DuckieBot: false
+  input_mask_DuckieBot: true
 controller:
   max_speed: 0.2
   min_speed_percent: 0.4

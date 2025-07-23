@@ -78,7 +78,7 @@ class ControlObstacleNode(DTROS):
             # rate.sleep()
             # === Zustand: Drehen ===
             if self._control_mode == ObstacleMode.Spin:
-                self.pub_cmd_vel.publish(Twist2DStamped(v=0, omega=1))
+                self.pub_cmd_vel.publish(Twist2DStamped(v=0, omega=1.2))
                 # rospy.loginfo("[ObstacleControl] Drehen... (Duckie erkannt)")
                 # rospy.loginfo_throttle(1, "[ObstacleControl] Drehen... (Duckie erkannt)")
                 if not self._duckie_detected:
