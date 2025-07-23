@@ -219,7 +219,7 @@ class DetectLaneNode(DTROS):
         previous_dx = 0
         previous_dy = 0
         # search for right line if a middle line was found
-        if len(middle_pts) >= 2 and self.drive_left == False:
+        if len(middle_pts) >= 2:
             viewed_pt = 0
 
             while viewed_pt <= len(middle_pts) -2:
@@ -228,8 +228,13 @@ class DetectLaneNode(DTROS):
                 # calculate orientation between middle line points
                 orientation = calcOrientation(middle_pts[viewed_pt], middle_pts[viewed_pt+1])
                 # find first white pixel on the right from the middel point (right sideline)
-                dx = np.cos(orientation + (np.pi/2))
-                dy = np.sin(orientation + (np.pi/2))
+                dx, dy = 0, 0
+                if self.drive_left:
+                    dx = np.cos(orientation - (np.pi/2))
+                    dy = np.sin(orientation - (np.pi/2))
+                else:
+                    dx = np.cos(orientation + (np.pi/2))
+                    dy = np.sin(orientation + (np.pi/2))
 
                 delta_dx = previous_dx - dx
                 delta_dy = previous_dy - dy
@@ -248,7 +253,7 @@ class DetectLaneNode(DTROS):
                     # search for sideline
                     if 0 <= new_x < width and 0 <= new_y < height and int(mask_white[int(new_y), int(new_x)]) != 0:
                         sideline_pts.append((int(new_x), int(new_y)))
-                        midpoint = (int((new_x + middle_pts[viewed_pt][0]) / 1.97), int((new_y + middle_pts[viewed_pt][1]) / 2.0))
+                        midpoint = (int((new_x + middle_pts[viewed_pt][0]) / 2.0), int((new_y + middle_pts[viewed_pt][1]) / 2.0))
                         desired_centers.append(midpoint)
                         middle_pt_far_enough = True
                         # if midpoint[1] < 190 and middle_pt_far_enough == False:

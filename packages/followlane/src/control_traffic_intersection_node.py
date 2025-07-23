@@ -148,11 +148,11 @@ class ControlCrossingNode(DTROS):
             self.set_blinker_off()
 
     def set_blinker_left(self):
-        rospy.loginfo("[Crossing] Setze Blinker links.")
+        # rospy.loginfo("[Crossing] Setze Blinker links.")
         self.blinking.rgb_vals = [
             ColorRGBA(r=1.0, g=1.0, b=0.0, a=1.0),  # vorne links gelb
-            ColorRGBA(r=0.0, g=0.0, b=0.0, a=0.0),  # hinten rechts aus
-            ColorRGBA(r=0.0, g=0.0, b=0.0, a=0.0),  # vorne rechts aus
+            ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0),  # hinten rechts aus
+            ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0),  # vorne rechts aus
             ColorRGBA(r=0.0, g=0.0, b=0.0, a=0.0),  # 
             ColorRGBA(r=1.0, g=1.0, b=0.0, a=1.0),  # hinten links gelb
         ]
@@ -160,29 +160,29 @@ class ControlCrossingNode(DTROS):
         self.pub_blinken.publish(self.blinking)
 
     def set_blinker_right(self):
-        rospy.loginfo("[Crossing] Setze Blinker rechts.")
+        # rospy.loginfo("[Crossing] Setze Blinker rechts.")
         self.blinking.rgb_vals = [
-            ColorRGBA(r=0.0, g=0.0, b=0.0, a=0.0),  # vorne links aus
+            ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0),  # vorne links aus
             ColorRGBA(r=1.0, g=1.0, b=0.0, a=1.0),  # hinten rechts gelb an
             ColorRGBA(r=1.0, g=1.0, b=0.0, a=1.0),  # vorne rechts gelb an
             ColorRGBA(r=0.0, g=0.0, b=0.0, a=0.0),  # 
-            ColorRGBA(r=0.0, g=0.0, b=0.0, a=0.0),  # hinten links aus
+            ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0),  # hinten links aus
         ]
         self.pub_blinken.publish(self.blinking)
 
     def set_blinker_off(self):
-        rospy.loginfo("[Crossing] Blinker ausschalten.")
+        # rospy.loginfo("[Crossing] Blinker ausschalten.")
         self.blinking.rgb_vals = [
-            ColorRGBA(r=0.0, g=0.0, b=0.0, a=0.0),
-            ColorRGBA(r=0.0, g=0.0, b=0.0, a=0.0),
-            ColorRGBA(r=0.0, g=0.0, b=0.0, a=0.0),
-            ColorRGBA(r=0.0, g=0.0, b=0.0, a=0.0),
-            ColorRGBA(r=0.0, g=0.0, b=0.0, a=0.0),
+            ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0),  # Weiß Vorne Links
+            ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0),  # Rot Hinten Rechts
+            ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0),  # Weiß Vorne Rechts
+            ColorRGBA(r=0.0, g=1.0, b=0.0, a=1.0),  # Grün
+            ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0),  # Rot Hinten Links
         ]
         self.pub_blinken.publish(self.blinking)
 
     def set_default_lights(self):
-        rospy.loginfo("[Crossing] Setze Standardbeleuchtung.")
+        # rospy.loginfo("[Crossing] Setze Standardbeleuchtung.")
         self.blinking.rgb_vals = [
             ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0),  # Weiß Vorne Links
             ColorRGBA(r=1.0, g=0.0, b=0.0, a=1.0),  # Rot Hinten Rechts
@@ -201,37 +201,36 @@ class ControlCrossingNode(DTROS):
             if self._mode != CrossingMode.Idle:
                 if self._crossing_active:
                     elapsed = time.time() - self._start_time if self._start_time else 0
-                    
                     # Wartephase von 2 Sekunden mit Stillstand
                     if elapsed < 3.0:
                         twist.v = 0.0
                         twist.omega = 0.0
                     else:
-                        # Berechne Mittelpunkt der BBs
-                        BB_middlepoints = []
-                        for (x1, y1, x2, y2) in self.valid_boxes_coords:
-                            mx = (x1 + x2) / 2.0
-                            my = (y1 + y2) / 2.0
-                            BB_middlepoints.append((mx, my))
+                        # # Berechne Mittelpunkt der BBs
+                        # BB_middlepoints = []
+                        # for (x1, y1, x2, y2) in self.valid_boxes_coords:
+                        #     mx = (x1 + x2) / 2.0
+                        #     my = (y1 + y2) / 2.0
+                        #     BB_middlepoints.append((mx, my))
 
-                        # "Switch-Case" für CrossingMode
-                        if self._mode == CrossingMode.TurnRight:
-                            # Brauche auf niemanden zu achten
-                            allow_crossing = True
-                        elif self._mode == CrossingMode.GoStraight:
-                            # Betrachte rechts
-                            # Prüfe, ob ein Mittelpunkt im rechten Bilddrittel liegt
-                            allow_crossing = not any(mx > (2/3) * 640 for (mx, my) in BB_middlepoints)
-                        elif self._mode == CrossingMode.TurnLeft:
-                            # Betrachte rechts und vorne
-                            allow_crossing = not any((640 / 3) < mx <= (2 * 640 / 3) or mx > (2 * 640 / 3) for (mx, my) in BB_middlepoints)
-                        else:
-                            allow_crossing = False
+                        # # "Switch-Case" für CrossingMode
+                        # if self._mode == CrossingMode.TurnRight:
+                        #     # Brauche auf niemanden zu achten
+                        #     allow_crossing = True
+                        # elif self._mode == CrossingMode.GoStraight:
+                        #     # Betrachte rechts
+                        #     # Prüfe, ob ein Mittelpunkt im rechten Bilddrittel liegt
+                        #     allow_crossing = not any(mx > (2/3) * 640 for (mx, my) in BB_middlepoints)
+                        # elif self._mode == CrossingMode.TurnLeft:
+                        #     # Betrachte rechts und vorne
+                        #     allow_crossing = not any((640 / 3) < mx <= (2 * 640 / 3) or mx > (2 * 640 / 3) for (mx, my) in BB_middlepoints)
+                        # else:
+                        #     allow_crossing = False
                         
-                        # Führe Bewegung aus
-                        if allow_crossing:
-                            twist.v = self._movement['v']
-                            twist.omega = self._movement['omega']
+                        # # Führe Bewegung aus
+                        # if allow_crossing:
+                        twist.v = self._movement['v']
+                        twist.omega = self._movement['omega']
                     
                     duration = self._movement['duration']
 

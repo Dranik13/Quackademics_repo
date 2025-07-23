@@ -267,9 +267,9 @@ class DetectDuckieBot(DTROS):
                     
         cv2.polylines(image, [self.static_roi_polygon.astype(np.int32).reshape((-1, 1, 2))], isClosed=True, color=(0, 0, 255), thickness=2)
         # Bild publishen
-        if self.conf['debugging_output']['input_mask_DuckieBot'] or True:
-            ros_img = self.bridge.cv2_to_imgmsg(image, encoding="bgr8")
-            self.pub_image.publish(ros_img)
+        # if self.conf['debugging_output']['input_mask_DuckieBot']:
+        #     ros_img = self.bridge.cv2_to_imgmsg(image, encoding="bgr8")
+        #     self.pub_image.publish(ros_img)
         self.pub_duckie_box.publish(self.boxes_msg)
         self.pub_parking_free.publish(Bool(data= self.occupied_parkingspot))
         # self.pub_duckie_stopp.publish(self.Duckiebot_Stop)
@@ -281,6 +281,7 @@ class DetectDuckieBot(DTROS):
 
         cv2.imshow("Duckiebot Detection", image)
         cv2.waitKey(1)
+        print("Test")
 
         
 

@@ -107,7 +107,7 @@ class CrossingIntersectionNode(DTROS):
                     4
                 )
 
-        #Debug-Bild senden
+        # Debug-Bild senden
         debug_msg = self.bridge.cv2_to_imgmsg(debug_img, encoding="bgr8")
         self.pub_debug_img.publish(debug_msg)
 
