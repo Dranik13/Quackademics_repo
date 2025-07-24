@@ -32,12 +32,12 @@ white:
   # vh: 255
   # vl: 180
 # BEI BLAULICHEM BILD
-  # hh: 180
-  # hl: 0
-  # sh: 35
-  # sl: 0
-  # vh: 255
-  # vl: 170
+  hh: 180
+  hl: 0
+  sh: 63
+  sl: 0
+  vh: 255
+  vl: 180
 # Robin
   # hh: 255
   # hl: 0
@@ -46,12 +46,12 @@ white:
   # vh: 255
   # vl: 159
 #nacht
-  hh: 255
-  hl: 0
-  sh: 86
-  sl: 0
-  vh: 255
-  vl: 180
+  # hh: 255
+  # hl: 0
+  # sh: 90
+  # sl: 45
+  # vh: 255
+  # vl: 180
 yellow:
 # BEI GELBLICHEM BILD
   # hh: 40
@@ -64,9 +64,9 @@ yellow:
   hh: 40
   hl: 15
   sh: 255
-  sl: 60
+  sl: 37
   vh: 255
-  vl: 130
+  vl: 123
 red:
   hh: 0
   hl: 10

@@ -310,7 +310,7 @@ class DetectLaneNode(DTROS):
                 cx, cy = calcMiddlePtOfContours(lowest_contour)
 
                 if self.drive_left:
-                    desired_pt = (int(cx + 120)),(int(cy))
+                    desired_pt = (int(cx + 110)),(int(cy))
                 else:
                     desired_pt = (int(cx - 80)),(int(cy))
 

@@ -28,8 +28,8 @@ class CrossingIntersectionNode(DTROS):
     }
 
     # Rote HSV-Farbbereiche nach oben ausgelagert
-    LOWER_RED1 = np.array([0, 80, 90])
-    UPPER_RED1 = np.array([10, 180, 200])
+    LOWER_RED1 = np.array([0, 110, 135])
+    UPPER_RED1 = np.array([10, 255, 255])
     LOWER_RED2 = np.array([170, 80, 90])
     UPPER_RED2 = np.array([179, 180, 200])
 

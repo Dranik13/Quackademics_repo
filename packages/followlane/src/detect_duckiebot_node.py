@@ -64,8 +64,8 @@ class DetectDuckieBot(DTROS):
         self.static_roi_polygon = np.array([
                 (50, 480),
                 (640, 480),
-                (450, 380),
-                (220, 380)
+                (450, 320),
+                (220, 320)
             ])
         # Transformation Matrix für Birdview
         self.H_birdview = np.array([
