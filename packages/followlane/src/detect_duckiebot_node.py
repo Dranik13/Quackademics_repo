@@ -56,14 +56,16 @@ class DetectDuckieBot(DTROS):
         self.min_box_height_for_stop = 80  # typischer Wert für ca. 0.5 m Entfernung (abhängig von Kamera!)
         self.Duckiebot_Stop = False
         self.counter = 0
+        self.no_spot_counter =0
+        self.max_no_spot_frames = 20
 
 
         # Fahrbereich
         self.static_roi_polygon = np.array([
                 (50, 480),
                 (640, 480),
-                (420, 330),
-                (260, 330)
+                (450, 320),
+                (220, 320)
             ])
         # Transformation Matrix für Birdview
         self.H_birdview = np.array([
@@ -121,8 +123,8 @@ class DetectDuckieBot(DTROS):
         # Verlängertes p2
         x1_ext = int(round(x1 - dir_x * extend_pixels))
         y1_ext = int(round(y1 - dir_y * extend_pixels))
-        x2_ext = int(round(x2 + dir_x * (extend_pixels)))
-        y2_ext = int(round(y2 + dir_y * (extend_pixels))) 
+        x2_ext = int(round(x2 + dir_x * (extend_pixels*2)))
+        y2_ext = int(round(y2 + dir_y * (extend_pixels*2))) 
 
         return (x1_ext, y1_ext), (x2_ext, y2_ext)
 
@@ -281,8 +283,12 @@ class DetectDuckieBot(DTROS):
         if self.occupied_parkingspot and self.parking_spot_detected:
             rospy.loginfo("Parkplatz Belegt")
         # wenn parkplatz erkannt wurde wird einmal geprüft ob der parkplatz frei ist,bei neuer erkennung wird wieder einmal geprüft
-        if not self.parking_spot_detected:
-            self.occupied_parkingspot = False
+        if self.parking_spot_detected:
+            self.no_spot_counter =0
+        else: 
+            self.no_spot_counter += 1
+            if self.no_spot_counter >= self.max_no_spot_frames:
+                self.occupied_parkingspot = False
         if self.parking_spot_detected:
             self.parking_spot_detected = False
 

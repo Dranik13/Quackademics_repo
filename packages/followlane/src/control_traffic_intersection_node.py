@@ -189,7 +189,7 @@ class ControlCrossingNode(DTROS):
                     elapsed = time.time() - self._start_time if self._start_time else 0
                     # Wartephase von 2 Sekunden mit Stillstand
                     if elapsed < 3.0:
-                        # print("WILL V AUF 0 SETZEN!!!!!!!!")
+                        print("WILL V AUF 0 SETZEN!!!!!!!!")
                         twist.v = 0.0
                         twist.omega = 0.0
                     else:
@@ -216,7 +216,7 @@ class ControlCrossingNode(DTROS):
                                 # Betrachte rechts und vorne
                                 self.allow_crossing = len(BB_middlepoints) == 0
                                 # if not len(BB_middlepoints) == 0:
-                                #     print("SEHE MITTIG ODER RECHTS BOT")
+                                    # print("SEHE MITTIG ODER RECHTS BOT")
                             else:
                                 self.allow_crossing = False
                                 twist.v = 0.0
@@ -224,7 +224,7 @@ class ControlCrossingNode(DTROS):
                         
                         # Führe Bewegung aus
                         if self.allow_crossing:
-                            # print("FÜHRE BEWEGUNG AUS (KREUZUNG)!!!!")
+                            print("FÜHRE BEWEGUNG AUS (KREUZUNG)!!!!")
                             twist.v = self._movement['v']
                             twist.omega = self._movement['omega']
                             if self.timestamp == 0:

@@ -105,9 +105,7 @@ class SwitchControlNode(DTROS):
             # else:
             #     self.counter2 += 1
 
-            # if self.range.range <= 0.2:
-                # msg_cmd = Twist2DStamped(v=0, omega = 0)
-                # rospy.loginfo("Obstacle detected, stopping the vehicle")
+
             if self.DuckiebotStop:
                 msg_cmd = Twist2DStamped(v=0, omega = 0)
                 rospy.logdebug(1,"Obstacle detected, stopping the vehicle")
@@ -123,6 +121,9 @@ class SwitchControlNode(DTROS):
                     msg_cmd.v = self.compute_speed_cos(msg_cmd.omega, self.theta_max, self.v_max, self.v_min_percent)
             if msg_cmd.v > self.v_max:
                 msg_cmd.v = self.v_max
+            if self.range.range <= 0.3:
+                msg_cmd = Twist2DStamped(v=0, omega = 0)
+                rospy.loginfo("Obstacle detected, stopping the vehicle")
             self.pub_cmd_vel.publish(msg_cmd)
             # print("v: ", msg_cmd.v, "omega: ", msg_cmd.omega)
             # if msg_cmd.v > 0:
