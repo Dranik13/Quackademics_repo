@@ -63,7 +63,12 @@ class ParkingManagerNode(DTROS):
     
     def cb_single_mark_detected(self, msg):
         print(f"Einzelne Parkplatz-Markierung erkannt: {msg.data}")
-        if msg.data and self.waiting_for_single_mark:
+        if self.parking_spot_occupied:
+            print("Parkplatz belegt")
+            self.waiting_for_single_mark = False
+            self.parking_started = False
+            return
+        if msg.data and self.waiting_for_single_mark and not self.parking_spot_occupied :
             self.parking_started = True
             self.waiting_for_single_mark = False
             rospy.Timer(rospy.Duration(0.5), self._delayed_start_parking, oneshot=True)     

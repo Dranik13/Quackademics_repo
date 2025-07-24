@@ -26,6 +26,7 @@ class ControlParkingNode(DTROS):
         self.step_counter = 0
         self.active = False
         self.parking_routine_started = False
+        self.parking_active = False
         # self.step_start_time = None
         # # Schrittzeit-Tabelle (Sekunden)
         # self.step_durations = {
@@ -50,7 +51,7 @@ class ControlParkingNode(DTROS):
 
 
     def cb_mode(self, msg):
-        if (msg.data == ControlType.Parking.value) and (not self.parking_routine_started):
+        if (msg.data == ControlType.Parking.value) and (not self.parking_routine_started)and self.parking_active:
             rospy.loginfo(" Einparkvorgang aktiviert")
             self.active = True
             self.current_step = 0
@@ -58,8 +59,9 @@ class ControlParkingNode(DTROS):
             self.parking_routine_started = True
             
     def cb_parking_state(self, msg):
+        self.parking_active = msg.data
         if not msg.data:
-            self.parking_routine_started = False       
+            rospy.Timer(rospy.Duration(1.0), lambda event: setattr(self, 'parking_routine_started', False), oneshot=True)
     
     # Starte ausparkvorgang        
     def cb_unpark(self, msg):
@@ -138,20 +140,20 @@ class ControlParkingNode(DTROS):
             cmd.v = 0.0
             cmd.omega = 1.8
             self.step_counter += 1
-            if self.step_counter >= 10:
+            if self.step_counter >= 8:
                 self.current_step = 102
                 self.step_counter = 0
         elif self.current_step == 102:
             # Vorwärts + Lenken links
-            cmd.v = 0.2
+            cmd.v = 0.1
             cmd.omega = 0
             self.step_counter += 1
-            if self.step_counter >= 4:
+            if self.step_counter >= 8:
                 self.current_step = 103
                 self.step_counter = 0
         elif self.current_step == 103:
             # Vorwärts + Lenken rechts
-            cmd.v = 0.1
+            cmd.v = 0.0
             cmd.omega = -1.8
             self.step_counter += 1
             if self.step_counter >= 10:

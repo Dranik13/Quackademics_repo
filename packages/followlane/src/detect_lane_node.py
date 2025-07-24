@@ -44,8 +44,8 @@ class DetectLaneNode(DTROS):
         self.x_end = 0 
         self.y_end =0
 
-
-
+        self.Schubser = False
+        self.Schubser_counter = 0
         self.bb_duckiebots = Float64MultiArray()
         self.bb_duckies = Float64MultiArray()
 
@@ -117,9 +117,17 @@ class DetectLaneNode(DTROS):
         if self.obstacle_avoidance_timer_run == True:
             self.obstacle_avoidance_timer += 1
             # print("timer: ", self.obstacle_avoidance_timer / 10, " avoiding obstacle mode: ", self.avoiding_obstacles_mode)
-            # drive right again after 2 Seconds        
+            # drive right again after 2,5 Seconds    
+            # print("SchubserCounter: ", self.Schubser_counter)
+            # if self.drive_left:
+            #     self.Schubser_counter = 0
             if self.obstacle_avoidance_timer >= 20 and self.drive_left:
                 self.drive_left = False
+                # if self.Schubser_counter <= 4:
+                #     self.Schubser_counter += 1
+                #     self.Schubser = True
+                # else: 
+                #     self.Schubser = False
             # stop timer and check distance to yellow line again after 8 secs.
             if self.obstacle_avoidance_timer >= 120:
                 self.obstacle_avoidance_timer_run = False
@@ -302,7 +310,7 @@ class DetectLaneNode(DTROS):
                 cx, cy = calcMiddlePtOfContours(lowest_contour)
 
                 if self.drive_left:
-                    desired_pt = (int(cx + 80)),(int(cy))
+                    desired_pt = (int(cx + 120)),(int(cy))
                 else:
                     desired_pt = (int(cx - 80)),(int(cy))
 
@@ -328,17 +336,26 @@ class DetectLaneNode(DTROS):
 
         if len(desired_centers) >= 2 and desired_centers[len(desired_centers)-1][1] >= 110:
             msg_desired_center.data = float(desired_centers[len(desired_centers)-1][0])
+            # if self.Schubser:
+            #     msg_desired_center = 450
+            #     print("Schubse")
             self.pub_lane.publish(msg_desired_center)
             # print("SENDE: ", msg_desired_center)
 
         elif len(desired_centers) >= self.control_pt_nr:
             msg_desired_center.data = float(desired_centers[self.control_pt_nr-1][0])
             self.pub_lane.publish(msg_desired_center)
+            # if self.Schubser:
+            #     msg_desired_center = 450
+            #     print("Schubse")
             # print("SENDE: ", msg_desired_center)
 
         elif desired_centers:
             msg_desired_center.data = float(desired_centers[len(desired_centers)-1][0])
             self.pub_lane.publish(msg_desired_center)
+            # if self.Schubser:
+            #     msg_desired_center = 450
+            #     print("Schubse")
             # print("SENDE: ", msg_desired_center)
 ################################################################ INTERPOLATION ################################################################
         
